@@ -171,7 +171,21 @@ export default function CollegeDashboardContent() {
   // KPI calculations
   const totalStudents = students.length;
   const totalRevenue = feeRecords.reduce((sum, f) => sum + f.paidAmount, 0);
-  const totalDues = students.reduce((sum, s) => sum + (s.totalFees - s.paidFees), 0);
+
+  // Compute actual paid per student from fee records (not stale s.paidFees)
+  const paidByStudent = useMemo(() => {
+    const map: Record<string, number> = {};
+    feeRecords.forEach((f) => {
+      map[f.studentId] = (map[f.studentId] || 0) + f.paidAmount;
+    });
+    return map;
+  }, [feeRecords]);
+
+  const totalDues = students.reduce((sum, s) => {
+    const actualPaid = paidByStudent[s.id] || 0;
+    return sum + Math.max(0, s.totalFees - actualPaid);
+  }, 0);
+
   const totalDiscount = feeRecords.reduce((sum, f) => sum + f.discount, 0);
   const newThisMonth = students.filter((s) => s.admissionYear === '2026').length;
 

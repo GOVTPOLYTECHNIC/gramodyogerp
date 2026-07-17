@@ -128,7 +128,7 @@ export default function GatePassModal({ open, onClose, student }: GatePassModalP
           <div className="flex justify-end gap-3">
             <button onClick={onClose} className="btn-secondary">Close</button>
             <button
-              onClick={() => { toast.success('Gate pass sent to printer'); }}className="btn-primary flex items-center gap-2"
+              onClick={() => { window.print(); }}className="btn-primary flex items-center gap-2"
             >
               <Printer size={14} />
               Print Gate Pass

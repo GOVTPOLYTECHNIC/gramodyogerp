@@ -3,7 +3,6 @@ import React from 'react';
 import Modal from '@/components/ui/Modal';
 import { Student } from './studentData';
 import { Printer, QrCode } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface IDCardModalProps {
   open: boolean;
@@ -115,7 +114,7 @@ export default function IDCardModal({ open, onClose, student }: IDCardModalProps
         <div className="flex gap-3 w-full justify-end">
           <button onClick={onClose} className="btn-secondary">Close</button>
           <button
-            onClick={() => toast.success('ID card sent to printer')}
+            onClick={() => window.print()}
             className="btn-primary flex items-center gap-2"
           >
             <Printer size={14} />
