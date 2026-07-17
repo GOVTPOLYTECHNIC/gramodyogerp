@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Download } from 'lucide-react';
 import { Student } from './studentData';
-import { getStudents, saveStudents, deleteStudentAndFees } from '@/lib/studentStore';
+import { getStudents, saveStudents, deleteStudentAndFees, getFeeRecords } from '@/lib/studentStore';
 import StudentFilters from './StudentFilters';
 import StudentTable from './StudentTable';
 import AddStudentModal from './AddStudentModal';
@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 
 export default function StudentManagementContent() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [feeRecords, setFeeRecords] = useState<import('@/app/fee-management/components/feeData').FeeRecord[]>([]);
   const [search, setSearch] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
   const [filterCourse, setFilterCourse] = useState('');
@@ -31,6 +32,7 @@ export default function StudentManagementContent() {
   // Load from shared store on mount
   useEffect(() => {
     setStudents(getStudents());
+    setFeeRecords(getFeeRecords());
   }, []);
 
   const filtered = useMemo(() => {
@@ -124,6 +126,7 @@ export default function StudentManagementContent() {
       {/* Table */}
       <StudentTable
         students={paginated}
+        feeRecords={feeRecords}
         onEdit={setEditStudent}
         onDelete={setDeleteStudent}
         onGatePass={setGatePassStudent}
