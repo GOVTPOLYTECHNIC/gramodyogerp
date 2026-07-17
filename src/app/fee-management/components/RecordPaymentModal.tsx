@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '@/components/ui/Modal';
 import { FeeRecord, RECEIPT_PREFIX, School } from './feeData';
-import { mockStudents } from '@/app/student-management/components/studentData';
+import { Student } from '@/app/student-management/components/studentData';
+import { getStudents } from '@/lib/studentStore';
 
 interface RecordPaymentModalProps {
   open: boolean;
@@ -24,18 +25,18 @@ export default function RecordPaymentModal({
   open, onClose, onRecord, existingCount,
 }: RecordPaymentModalProps) {
   const [loading, setLoading] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState(mockStudents[0]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   const {
     register,
     handleSubmit,
     watch,
-    setValue,
     reset,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
-      studentId: mockStudents[0].id,
+      studentId: '',
       paymentMode: 'Cash',
       paidAmount: '',
       discount: '0',
@@ -43,14 +44,35 @@ export default function RecordPaymentModal({
     },
   });
 
+  // Load students from store every time modal opens
+  useEffect(() => {
+    if (open) {
+      const list = getStudents();
+      setStudents(list);
+      if (list.length > 0) {
+        setSelectedStudent(list[0]);
+        reset({
+          studentId: list[0].id,
+          paymentMode: 'Cash',
+          paidAmount: '',
+          discount: '0',
+          remarks: '',
+        });
+      } else {
+        setSelectedStudent(null);
+        reset({ studentId: '', paymentMode: 'Cash', paidAmount: '', discount: '0', remarks: '' });
+      }
+    }
+  }, [open, reset]);
+
   const studentId = watch('studentId');
   const discountVal = Number(watch('discount') || 0);
   const paidAmountVal = Number(watch('paidAmount') || 0);
 
   useEffect(() => {
-    const s = mockStudents.find((st) => st.id === studentId);
+    const s = students.find((st) => st.id === studentId);
     if (s) setSelectedStudent(s);
-  }, [studentId]);
+  }, [studentId, students]);
 
   const netFee = selectedStudent ? selectedStudent.totalFees - discountVal : 0;
   const balance = netFee - paidAmountVal;
@@ -70,6 +92,9 @@ export default function RecordPaymentModal({
     if (paid >= net) status = 'Paid';
     else if (paid > 0) status = 'Partial';
 
+    const today = new Date();
+    const paymentDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+
     const newRecord: FeeRecord = {
       id: `fee-${Date.now()}`,
       receiptNo,
@@ -82,14 +107,13 @@ export default function RecordPaymentModal({
       annualFee: s.totalFees,
       discount: disc,
       paidAmount: paid,
-      paymentDate: '17/07/2026',
+      paymentDate,
       paymentMode: data.paymentMode,
       remarks: data.remarks,
       status,
       academicYear: '2025-26',
     };
 
-    // Backend integration point: POST /api/fee-payments with newRecord
     setTimeout(() => {
       setLoading(false);
       onRecord(newRecord);
@@ -108,16 +132,22 @@ export default function RecordPaymentModal({
           <p className="text-xs text-muted-foreground mb-1">
             Choosing a student auto-fills institution, course, and fee details
           </p>
-          <select
-            className="input-field"
-            {...register('studentId', { required: true })}
-          >
-            {mockStudents.map((s) => (
-              <option key={`pay-student-${s.id}`} value={s.id}>
-                {s.rollNo} — {s.name} ({s.school.includes('Polytechnic') ? 'RGP' : s.school.includes('ITI') ? 'ITI' : 'GSS'})
-              </option>
-            ))}
-          </select>
+          {students.length === 0 ? (
+            <div className="input-field text-muted-foreground text-sm bg-secondary/50">
+              No students found — please add students in Student Management first
+            </div>
+          ) : (
+            <select
+              className="input-field"
+              {...register('studentId', { required: true })}
+            >
+              {students.map((s) => (
+                <option key={`pay-student-${s.id}`} value={s.id}>
+                  {s.rollNo} — {s.name} ({s.school.includes('Polytechnic') ? 'RGP' : s.school.includes('ITI') ? 'ITI' : 'GSS'})
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Student Info Preview */}
@@ -257,8 +287,8 @@ export default function RecordPaymentModal({
           <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
           <button
             type="submit"
-            disabled={loading}
-            className="btn-primary flex items-center gap-2 min-w-[160px] justify-center"
+            disabled={loading || students.length === 0}
+            className="btn-primary flex items-center gap-2 min-w-[160px] justify-center disabled:opacity-50"
           >
             {loading ? (
               <>

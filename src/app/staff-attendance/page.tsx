@@ -1,9 +1,17 @@
 'use client';
 import React, { useState } from 'react';
 import AppLayout from '@/components/AppLayout';
-import { CalendarCheck, CheckCircle2, XCircle, Clock, Users } from 'lucide-react';
+import { CalendarCheck, CheckCircle2, XCircle, Clock, Users, Pencil, Trash2, X, Save, Plus } from 'lucide-react';
 
-const staffList = [
+interface StaffMember {
+  id: number;
+  name: string;
+  role: string;
+  department: string;
+  status: string;
+}
+
+const initialStaffList: StaffMember[] = [
   { id: 1, name: 'Rajesh Kumar', role: 'Principal', department: 'Administration', status: 'present' },
   { id: 2, name: 'Sunita Devi', role: 'Lecturer', department: 'Computer Science', status: 'present' },
   { id: 3, name: 'Mohan Lal', role: 'Instructor', department: 'Electrical', status: 'absent' },
@@ -16,11 +24,23 @@ const staffList = [
 
 type AttendanceStatus = 'present' | 'absent' | 'late';
 
+interface EditForm {
+  name: string;
+  role: string;
+  department: string;
+}
+
 export default function StaffAttendancePage() {
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const [staffList, setStaffList] = useState<StaffMember[]>(initialStaffList);
   const [attendance, setAttendance] = useState<Record<number, AttendanceStatus>>(
-    Object.fromEntries(staffList.map((s) => [s.id, s.status as AttendanceStatus]))
+    Object.fromEntries(initialStaffList.map((s) => [s.id, s.status as AttendanceStatus]))
   );
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<EditForm>({ name: '', role: '', department: '' });
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState<EditForm>({ name: '', role: '', department: '' });
 
   const counts = {
     present: Object.values(attendance).filter((v) => v === 'present').length,
@@ -34,12 +54,64 @@ export default function StaffAttendancePage() {
     late: { label: 'Late', color: 'text-yellow-600 bg-yellow-50 border-yellow-200', icon: <Clock size={14} /> },
   };
 
+  const handleEditStart = (staff: StaffMember) => {
+    setEditingId(staff.id);
+    setEditForm({ name: staff.name, role: staff.role, department: staff.department });
+  };
+
+  const handleEditSave = (id: number) => {
+    if (!editForm.name.trim()) return;
+    setStaffList((prev) =>
+      prev.map((s) => s.id === id ? { ...s, name: editForm.name.trim(), role: editForm.role.trim(), department: editForm.department.trim() } : s)
+    );
+    setEditingId(null);
+  };
+
+  const handleEditCancel = () => {
+    setEditingId(null);
+  };
+
+  const handleDelete = (id: number) => {
+    setStaffList((prev) => prev.filter((s) => s.id !== id));
+    setAttendance((prev) => {
+      const updated = { ...prev };
+      delete updated[id];
+      return updated;
+    });
+    setDeleteConfirmId(null);
+  };
+
+  const handleAddStaff = () => {
+    if (!addForm.name.trim()) return;
+    const newId = Date.now();
+    const newStaff: StaffMember = {
+      id: newId,
+      name: addForm.name.trim(),
+      role: addForm.role.trim() || 'Staff',
+      department: addForm.department.trim() || 'General',
+      status: 'present',
+    };
+    setStaffList((prev) => [...prev, newStaff]);
+    setAttendance((prev) => ({ ...prev, [newId]: 'present' }));
+    setAddForm({ name: '', role: '', department: '' });
+    setAddOpen(false);
+  };
+
   return (
     <AppLayout title="Staff Attendance">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Staff Attendance</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{today}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Staff Attendance</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{today}</p>
+          </div>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="btn-primary flex items-center gap-2 h-9"
+          >
+            <Plus size={16} />
+            Add Staff
+          </button>
         </div>
 
         {/* KPI Cards */}
@@ -98,24 +170,62 @@ export default function StaffAttendancePage() {
                   <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Department</th>
                   <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Status</th>
                   <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Mark</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {staffList.map((staff, idx) => {
-                  const status = attendance[staff.id];
+                  const status = attendance[staff.id] || 'present';
                   const cfg = statusConfig[status];
+                  const isEditing = editingId === staff.id;
+                  const isDeleting = deleteConfirmId === staff.id;
+
                   return (
                     <tr key={staff.id} className="hover:bg-secondary/30 transition-colors">
                       <td className="px-4 py-3 text-muted-foreground">{idx + 1}</td>
-                      <td className="px-4 py-3 font-medium text-foreground">{staff.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{staff.role}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{staff.department}</td>
+
+                      {/* Name */}
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        {isEditing ? (
+                          <input
+                            className="input-field py-1 text-sm w-36"
+                            value={editForm.name}
+                            onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                          />
+                        ) : staff.name}
+                      </td>
+
+                      {/* Role */}
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {isEditing ? (
+                          <input
+                            className="input-field py-1 text-sm w-28"
+                            value={editForm.role}
+                            onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
+                          />
+                        ) : staff.role}
+                      </td>
+
+                      {/* Department */}
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {isEditing ? (
+                          <input
+                            className="input-field py-1 text-sm w-32"
+                            value={editForm.department}
+                            onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
+                          />
+                        ) : staff.department}
+                      </td>
+
+                      {/* Status Badge */}
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${cfg.color}`}>
                           {cfg.icon}
                           {cfg.label}
                         </span>
                       </td>
+
+                      {/* Mark Attendance */}
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
                           {(['present', 'absent', 'late'] as AttendanceStatus[]).map((s) => (
@@ -133,6 +243,61 @@ export default function StaffAttendancePage() {
                           ))}
                         </div>
                       </td>
+
+                      {/* Edit / Delete Actions */}
+                      <td className="px-4 py-3">
+                        {isDeleting ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-danger font-medium">Delete?</span>
+                            <button
+                              onClick={() => handleDelete(staff.id)}
+                              className="px-2 py-1 rounded text-xs font-medium bg-danger text-white hover:bg-danger/90 transition-colors"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              className="px-2 py-1 rounded text-xs font-medium border border-border hover:bg-secondary transition-colors"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : isEditing ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleEditSave(staff.id)}
+                              className="p-1.5 rounded text-green-600 hover:bg-green-50 transition-colors"
+                              title="Save"
+                            >
+                              <Save size={15} />
+                            </button>
+                            <button
+                              onClick={handleEditCancel}
+                              className="p-1.5 rounded text-muted-foreground hover:bg-secondary transition-colors"
+                              title="Cancel"
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleEditStart(staff)}
+                              className="p-1.5 rounded text-primary hover:bg-primary/10 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(staff.id)}
+                              className="p-1.5 rounded text-danger hover:bg-danger/10 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -140,6 +305,59 @@ export default function StaffAttendancePage() {
             </table>
           </div>
         </div>
+
+        {/* Add Staff Modal */}
+        {addOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-background rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-foreground">Add New Staff</h3>
+                <button onClick={() => setAddOpen(false)} className="p-1.5 rounded hover:bg-secondary transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-1">Name <span className="text-danger">*</span></label>
+                  <input
+                    className="input-field"
+                    placeholder="Enter staff name"
+                    value={addForm.name}
+                    onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-1">Role</label>
+                  <input
+                    className="input-field"
+                    placeholder="e.g. Lecturer, Instructor"
+                    value={addForm.role}
+                    onChange={(e) => setAddForm((f) => ({ ...f, role: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-1">Department</label>
+                  <input
+                    className="input-field"
+                    placeholder="e.g. Computer Science"
+                    value={addForm.department}
+                    onChange={(e) => setAddForm((f) => ({ ...f, department: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+                <button onClick={() => setAddOpen(false)} className="btn-secondary">Cancel</button>
+                <button
+                  onClick={handleAddStaff}
+                  disabled={!addForm.name.trim()}
+                  className="btn-primary disabled:opacity-50"
+                >
+                  Add Staff
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
