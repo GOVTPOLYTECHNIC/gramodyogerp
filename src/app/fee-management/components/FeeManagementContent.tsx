@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Download } from 'lucide-react';
-import { FeeRecord, mockFeeRecords } from './feeData';
+import { FeeRecord } from './feeData';
 import FeeKPICards from './FeeKPICards';
 import FeeFilters from './FeeFilters';
 import FeeTable from './FeeTable';
@@ -12,7 +12,7 @@ import { getFeeRecords, saveFeeRecords } from '@/lib/studentStore';
 import { toast } from 'sonner';
 
 export default function FeeManagementContent() {
-  const [records, setRecords] = useState<FeeRecord[]>(mockFeeRecords);
+  const [records, setRecords] = useState<FeeRecord[]>([]);
   const [search, setSearch] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
   const [filterStatus, setFilterStatus] = useState('');

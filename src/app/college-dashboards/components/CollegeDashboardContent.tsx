@@ -1,9 +1,10 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Users, IndianRupee, AlertCircle, Tag, Building2, CheckCircle2, Clock, XCircle,  } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,  } from 'recharts';
-import { mockStudents } from '@/app/student-management/components/studentData';
-import { mockFeeRecords } from '@/app/fee-management/components/feeData';
+import { getStudents, getFeeRecords } from '@/lib/studentStore';
+import { Student } from '@/app/student-management/components/studentData';
+import { FeeRecord } from '@/app/fee-management/components/feeData';
 
 type CollegeKey = 'RGP' | 'ITI' | 'GSS';
 
@@ -146,18 +147,25 @@ const BarTooltip = ({
 
 export default function CollegeDashboardContent() {
   const [activeCollege, setActiveCollege] = useState<CollegeKey>('RGP');
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [allFeeRecords, setAllFeeRecords] = useState<FeeRecord[]>([]);
+
+  useEffect(() => {
+    setAllStudents(getStudents());
+    setAllFeeRecords(getFeeRecords());
+  }, []);
 
   const college = COLLEGES.find((c) => c.key === activeCollege)!;
   const schoolName = SCHOOL_MAP[activeCollege];
 
   const students = useMemo(
-    () => mockStudents.filter((s) => s.school === schoolName),
-    [schoolName]
+    () => allStudents.filter((s) => s.school === schoolName),
+    [allStudents, schoolName]
   );
 
   const feeRecords = useMemo(
-    () => mockFeeRecords.filter((f) => f.school === schoolName),
-    [schoolName]
+    () => allFeeRecords.filter((f) => f.school === schoolName),
+    [allFeeRecords, schoolName]
   );
 
   // KPI calculations

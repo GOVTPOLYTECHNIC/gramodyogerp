@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Download } from 'lucide-react';
-import { Student, mockStudents } from './studentData';
+import { Student } from './studentData';
 import { getStudents, saveStudents, deleteStudentAndFees } from '@/lib/studentStore';
 import StudentFilters from './StudentFilters';
 import StudentTable from './StudentTable';
@@ -13,7 +13,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
 
 export default function StudentManagementContent() {
-  const [students, setStudents] = useState<Student[]>(mockStudents);
+  const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
   const [filterCourse, setFilterCourse] = useState('');

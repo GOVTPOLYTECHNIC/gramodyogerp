@@ -1,7 +1,8 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AlertTriangle, Search, Filter, Download, Phone, IndianRupee } from 'lucide-react';
-import { mockStudents } from '@/app/student-management/components/studentData';
+import { getStudents } from '@/lib/studentStore';
+import { Student } from '@/app/student-management/components/studentData';
 
 const COLLEGES = ['All', 'Rajiv Gandhi Polytechnic', 'Rajiv Gandhi ITI', 'GSS Diploma College'];
 const COLLEGE_SHORT: Record<string, string> = {
@@ -25,16 +26,22 @@ const fmt = (n: number) =>
     : `₹${n}`;
 
 export default function DefaulterListContent() {
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState('');
   const [college, setCollege] = useState('All');
   const [semester, setSemester] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [courseFilter, setCourseFilter] = useState('All');
+
+  useEffect(() => {
+    setAllStudents(getStudents());
+  }, []);
 
   const defaulters = useMemo(() => {
-    return mockStudents.filter(
+    return allStudents.filter(
       (s) => s.feeStatus === 'Overdue' || s.feeStatus === 'Partial' || s.feeStatus === 'Pending'
     );
-  }, []);
+  }, [allStudents]);
 
   const filtered = useMemo(() => {
     return defaulters.filter((s) => {
@@ -59,8 +66,6 @@ export default function DefaulterListContent() {
     const src = college === 'All' ? defaulters : defaulters.filter((s) => s.school === college);
     return ['All', ...Array.from(new Set(src.map((s) => s.course)))];
   }, [college, defaulters]);
-
-  const [courseFilter, setCourseFilter] = useState('All');
 
   const finalFiltered = useMemo(() => {
     return filtered.filter((s) => courseFilter === 'All' || s.course === courseFilter);
@@ -202,7 +207,8 @@ export default function DefaulterListContent() {
               {finalFiltered.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="text-center py-10 text-muted-foreground text-sm">
-                    No defaulters found for the selected filters.
+                    {allStudents.length === 0
+                      ? 'No students enrolled yet. Add students from Student Management.' :'No defaulters found for the selected filters.'}
                   </td>
                 </tr>
               ) : (

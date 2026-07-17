@@ -1,5 +1,5 @@
 'use client';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   IndianRupee,
   CheckCircle2,
@@ -26,8 +26,7 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { mockFeeRecords } from '@/app/fee-management/components/feeData';
-import { mockStudents } from '@/app/student-management/components/studentData';
+import { getStudents, getFeeRecords } from '@/lib/studentStore';
 
 const COLLEGES = [
   {
@@ -120,23 +119,31 @@ const CustomTooltip = ({
 };
 
 export default function FinancialReconciliationContent() {
+  const [students, setStudents] = useState<any[]>([]);
+  const [feeRecords, setFeeRecords] = useState<any[]>([]);
+
+  useEffect(() => {
+    setStudents(getStudents());
+    setFeeRecords(getFeeRecords());
+  }, []);
+
   // ── Institution-level aggregations ──────────────────────────────────────
   const institutionStats = useMemo(() => {
     return COLLEGES.map((col) => {
-      const records = mockFeeRecords.filter((f) => f.school === col.schoolName);
-      const students = mockStudents.filter((s) => s.school === col.schoolName);
+      const records = feeRecords.filter((f) => f.school === col.schoolName);
+      const studentsInCollege = students.filter((s) => s.school === col.schoolName);
 
-      const totalBilled = students.reduce((s, st) => s + st.totalFees, 0);
+      const totalBilled = studentsInCollege.reduce((s, st) => s + st.totalFees, 0);
       const totalCollected = records.reduce((s, r) => s + r.paidAmount, 0);
       const totalDiscount = records.reduce((s, r) => s + r.discount, 0);
-      const totalPending = students.reduce(
+      const totalPending = studentsInCollege.reduce(
         (s, st) => s + Math.max(0, st.totalFees - st.paidFees),
         0
       );
-      const paidCount = students.filter((s) => s.feeStatus === 'Paid').length;
-      const overdueCount = students.filter((s) => s.feeStatus === 'Overdue').length;
-      const partialCount = students.filter((s) => s.feeStatus === 'Partial').length;
-      const pendingCount = students.filter((s) => s.feeStatus === 'Pending').length;
+      const paidCount = studentsInCollege.filter((s) => s.feeStatus === 'Paid').length;
+      const overdueCount = studentsInCollege.filter((s) => s.feeStatus === 'Overdue').length;
+      const partialCount = studentsInCollege.filter((s) => s.feeStatus === 'Partial').length;
+      const pendingCount = studentsInCollege.filter((s) => s.feeStatus === 'Pending').length;
       const collectionRate =
         totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;
 
@@ -151,10 +158,10 @@ export default function FinancialReconciliationContent() {
         partialCount,
         pendingCount,
         collectionRate,
-        studentCount: students.length,
+        studentCount: studentsInCollege.length,
       };
     });
-  }, []);
+  }, [students, feeRecords]);
 
   // ── Grand totals ─────────────────────────────────────────────────────────
   const grandTotals = useMemo(() => {
@@ -178,7 +185,7 @@ export default function FinancialReconciliationContent() {
   // ── Course-wise revenue ──────────────────────────────────────────────────
   const courseRevenueData = useMemo(() => {
     const map: Record<string, { collected: number; pending: number; college: string }> = {};
-    mockStudents.forEach((s) => {
+    students.forEach((s) => {
       if (!map[s.course]) {
         const col = COLLEGES.find((c) => c.schoolName === s.school);
         map[s.course] = { collected: 0, pending: 0, college: col?.shortName || '' };
@@ -193,12 +200,12 @@ export default function FinancialReconciliationContent() {
         ...data,
       }))
       .sort((a, b) => b.collected - a.collected);
-  }, []);
+  }, [students]);
 
   // ── Semester breakdown ───────────────────────────────────────────────────
   const semesterData = useMemo(() => {
     const map: Record<string, { collected: number; pending: number; students: number }> = {};
-    mockStudents.forEach((s) => {
+    students.forEach((s) => {
       const key = `Sem ${s.semester}`;
       if (!map[key]) map[key] = { collected: 0, pending: 0, students: 0 };
       map[key].collected += s.paidFees;
@@ -208,12 +215,12 @@ export default function FinancialReconciliationContent() {
     return Object.entries(map)
       .map(([sem, data]) => ({ sem, ...data }))
       .sort((a, b) => parseInt(a.sem.split(' ')[1]) - parseInt(b.sem.split(' ')[1]));
-  }, []);
+  }, [students]);
 
   // ── Payment method summary ───────────────────────────────────────────────
   const paymentMethodData = useMemo(() => {
     const map: Record<string, { amount: number; count: number }> = {};
-    mockFeeRecords.forEach((r) => {
+    feeRecords.forEach((r) => {
       if (r.paidAmount > 0) {
         if (!map[r.paymentMode]) map[r.paymentMode] = { amount: 0, count: 0 };
         map[r.paymentMode].amount += r.paidAmount;
@@ -221,20 +228,20 @@ export default function FinancialReconciliationContent() {
       }
     });
     return Object.entries(map).map(([mode, data]) => ({ mode, ...data }));
-  }, []);
+  }, [feeRecords]);
 
   const totalPaymentAmount = paymentMethodData.reduce((s, d) => s + d.amount, 0);
 
   // ── Fee status pie data ──────────────────────────────────────────────────
   const feeStatusData = useMemo(() => {
     const map: Record<string, number> = { Paid: 0, Partial: 0, Pending: 0, Overdue: 0 };
-    mockStudents.forEach((s) => {
+    students.forEach((s) => {
       map[s.feeStatus] = (map[s.feeStatus] || 0) + 1;
     });
     return Object.entries(map)
       .filter(([, v]) => v > 0)
       .map(([name, value]) => ({ name, value }));
-  }, []);
+  }, [students]);
 
   // ── Institution comparison bar data ─────────────────────────────────────
   const comparisonData = institutionStats.map((s) => ({
