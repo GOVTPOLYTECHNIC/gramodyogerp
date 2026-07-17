@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Eye, EyeOff, Copy, CheckCircle, GraduationCap, Building2, Users } from 'lucide-react';
+import { Eye, EyeOff, Copy, CheckCircle, GraduationCap, Building2, Users, Shield, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import AppLogo from '@/components/ui/AppLogo';
@@ -38,13 +38,46 @@ const mockCredentials: Record<Role, { label: string; identifier: string; passwor
 };
 
 const schools = [
-  { id: 'school-rgp', name: 'Rajiv Gandhi Polytechnic', short: 'RGP', icon: Building2, color: 'text-blue-700', bg: 'bg-blue-50' },
-  { id: 'school-iti', name: 'Rajiv Gandhi ITI', short: 'ITI', icon: GraduationCap, color: 'text-amber-700', bg: 'bg-amber-50' },
-  { id: 'school-gss', name: 'GSS Diploma College', short: 'GSS', icon: Users, color: 'text-green-700', bg: 'bg-green-50' },
+  { id: 'school-rgp', name: 'Rajiv Gandhi Polytechnic', short: 'RGP', icon: Building2 },
+  { id: 'school-iti', name: 'Rajiv Gandhi ITI', short: 'ITI', icon: GraduationCap },
+  { id: 'school-gss', name: 'GSS Diploma College', short: 'GSS', icon: Users },
+];
+
+const roleCards = [
+  {
+    role: 'admin' as Role,
+    label: 'Admin Login',
+    description: 'Full system access — manage all institutions',
+    icon: Shield,
+    color: 'text-purple-700',
+    bg: 'bg-purple-50',
+    border: 'border-purple-200 hover:border-purple-400',
+    emoji: '🛡️',
+  },
+  {
+    role: 'staff' as Role,
+    label: 'Staff Login',
+    description: 'Faculty & staff portal — attendance, payroll, leaves',
+    icon: Users,
+    color: 'text-blue-700',
+    bg: 'bg-blue-50',
+    border: 'border-blue-200 hover:border-blue-400',
+    emoji: '👤',
+  },
+  {
+    role: 'student' as Role,
+    label: 'Student Login',
+    description: 'Student portal — fees, ID card, gate pass',
+    icon: GraduationCap,
+    color: 'text-green-700',
+    bg: 'bg-green-50',
+    border: 'border-green-200 hover:border-green-400',
+    emoji: '🎓',
+  },
 ];
 
 export default function LoginClient() {
-  const [role, setRole] = useState<Role>('admin');
+  const [role, setRole] = useState<Role | null>(null);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -53,13 +86,14 @@ export default function LoginClient() {
     register,
     handleSubmit,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<LoginForm>({ defaultValues: { remember: false } });
 
   const onSubmit = (data: LoginForm) => {
+    if (!role) return;
     setLoading(true);
     const creds = mockCredentials[role];
-    // Backend integration point: POST /api/auth/login with { role, identifier, password }
     setTimeout(() => {
       setLoading(false);
       if (
@@ -74,9 +108,9 @@ export default function LoginClient() {
     }, 1200);
   };
 
-  const handleUseCreds = (r: Role) => {
-    const c = mockCredentials[r];
-    setRole(r);
+  const handleUseCreds = () => {
+    if (!role) return;
+    const c = mockCredentials[role];
     setValue('identifier', c.identifier);
     setValue('password', c.password);
     toast.info(`${c.label} credentials filled`);
@@ -88,7 +122,17 @@ export default function LoginClient() {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const creds = mockCredentials[role];
+  const handleSelectRole = (r: Role) => {
+    setRole(r);
+    reset({ identifier: '', password: '', remember: false });
+  };
+
+  const handleBack = () => {
+    setRole(null);
+    reset();
+  };
+
+  const creds = role ? mockCredentials[role] : null;
 
   return (
     <div className="min-h-screen flex">
@@ -144,7 +188,7 @@ export default function LoginClient() {
         </div>
       </div>
 
-      {/* Right panel — form */}
+      {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-6 bg-background">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
@@ -153,166 +197,199 @@ export default function LoginClient() {
             <span className="font-bold text-lg text-primary">GramodyogERP</span>
           </div>
 
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-foreground">Sign In</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Select your role and enter your credentials
-            </p>
-          </div>
-
-          {/* Role tabs */}
-          <div className="flex bg-secondary rounded-xl p-1 mb-6 gap-1">
-            {(['admin', 'staff', 'student'] as Role[]).map((r) => (
-              <button
-                key={`role-tab-${r}`}
-                onClick={() => {
-                  setRole(r);
-                  setValue('identifier', '');
-                  setValue('password', '');
-                }}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all duration-150 capitalize ${
-                  role === r
-                    ? 'bg-card text-primary shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {r === 'admin' ? '🛡️ Admin' : r === 'staff' ? '👤 Staff' : '🎓 Student'}
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* STEP 1: Role selection */}
+          {!role && (
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-1.5">
-                {creds.identifierLabel}
-              </label>
-              <input
-                type={role === 'student' ? 'text' : 'email'}
-                placeholder={
-                  role === 'student' ?'Enter Roll No or Email' :'Enter your email address'
-                }
-                className={`input-field ${errors.identifier ? 'border-danger focus:ring-danger/30' : ''}`}
-                {...register('identifier', {
-                  required: `${creds.identifierLabel} is required`,
-                })}
-              />
-              {errors.identifier && (
-                <p className="text-xs text-danger mt-1">{errors.identifier.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  placeholder="Enter your password"
-                  className={`input-field pr-10 ${errors.password ? 'border-danger focus:ring-danger/30' : ''}`}
-                  {...register('password', {
-                    required: 'Password is required',
-                    minLength: {
-                      value: 6,
-                      message: 'Password must be at least 6 characters',
-                    },
-                  })}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label={showPass ? 'Hide password' : 'Show password'}
-                >
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+              <div className="mb-8">
+                <h1 className="text-2xl font-bold text-foreground">Welcome Back</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Select your login type to continue
+                </p>
               </div>
-              {errors.password && (
-                <p className="text-xs text-danger mt-1">{errors.password.message}</p>
-              )}
+
+              <div className="space-y-3">
+                {roleCards.map((rc) => {
+                  const Icon = rc.icon;
+                  return (
+                    <button
+                      key={`role-card-${rc.role}`}
+                      onClick={() => handleSelectRole(rc.role)}
+                      className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 bg-card transition-all duration-150 text-left ${rc.border}`}
+                    >
+                      <div className={`w-12 h-12 rounded-xl ${rc.bg} flex items-center justify-center flex-shrink-0`}>
+                        <Icon size={22} className={rc.color} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-foreground text-sm">{rc.emoji} {rc.label}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{rc.description}</p>
+                      </div>
+                      <svg className="w-5 h-5 text-muted-foreground flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+          )}
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 rounded border-border accent-primary"
-                  {...register('remember')}
-                />
-                <span className="text-sm text-muted-foreground">Remember me</span>
-              </label>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-primary font-semibold hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
+          {/* STEP 2: Login form */}
+          {role && creds && (
+            <div>
+              <div className="mb-6">
+                <button
+                  onClick={handleBack}
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+                >
+                  <ArrowLeft size={15} />
+                  Back to login options
+                </button>
+                <div className="flex items-center gap-3 mb-2">
+                  {(() => {
+                    const rc = roleCards.find((r) => r.role === role)!;
+                    const Icon = rc.icon;
+                    return (
+                      <div className={`w-10 h-10 rounded-xl ${rc.bg} flex items-center justify-center`}>
+                        <Icon size={18} className={rc.color} />
+                      </div>
+                    );
+                  })()}
+                  <div>
+                    <h1 className="text-xl font-bold text-foreground">{creds.label} Sign In</h1>
+                    <p className="text-xs text-muted-foreground">Enter your credentials to continue</p>
+                  </div>
+                </div>
+              </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full h-11 flex items-center justify-center gap-2 text-base"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  Verifying...
-                </>
-              ) : (
-                `Sign In as ${creds.label}`
-              )}
-            </button>
-          </form>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-1.5">
+                    {creds.identifierLabel}
+                  </label>
+                  <input
+                    type={role === 'student' ? 'text' : 'email'}
+                    placeholder={
+                      role === 'student' ? 'Enter Roll No or Email' : 'Enter your email address'
+                    }
+                    className={`input-field ${errors.identifier ? 'border-danger focus:ring-danger/30' : ''}`}
+                    {...register('identifier', {
+                      required: `${creds.identifierLabel} is required`,
+                    })}
+                  />
+                  {errors.identifier && (
+                    <p className="text-xs text-danger mt-1">{errors.identifier.message}</p>
+                  )}
+                </div>
 
-          {/* Demo credentials */}
-          <div className="mt-6 rounded-xl border border-border bg-secondary/50 p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-              Demo Credentials
-            </p>
-            <div className="space-y-2">
-              {(['admin', 'staff', 'student'] as Role[]).map((r) => {
-                const c = mockCredentials[r];
-                return (
-                  <div
-                    key={`demo-${r}`}
-                    className="flex items-center justify-between bg-card rounded-lg px-3 py-2 border border-border"
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-1.5">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPass ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      className={`input-field pr-10 ${errors.password ? 'border-danger focus:ring-danger/30' : ''}`}
+                      {...register('password', {
+                        required: 'Password is required',
+                        minLength: { value: 6, message: 'Password must be at least 6 characters' },
+                      })}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showPass ? 'Hide password' : 'Show password'}
+                    >
+                      {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="text-xs text-danger mt-1">{errors.password.message}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-border accent-primary"
+                      {...register('remember')}
+                    />
+                    <span className="text-sm text-muted-foreground">Remember me</span>
+                  </label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm text-primary font-semibold hover:underline"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="badge badge-info capitalize text-xs">{c.label}</span>
-                      <span className="text-xs text-muted-foreground truncate max-w-[140px]">
-                        {c.identifier}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 ml-2">
+                    Forgot password?
+                  </Link>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn-primary w-full h-11 flex items-center justify-center gap-2 text-base"
+                >
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      Verifying...
+                    </>
+                  ) : (
+                    `Sign In as ${creds.label}`
+                  )}
+                </button>
+              </form>
+
+              {/* Demo credentials */}
+              <div className="mt-6 rounded-xl border border-border bg-secondary/50 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                    Demo Credentials
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleUseCreds}
+                    className="text-xs font-semibold text-primary hover:underline px-2 py-1 rounded hover:bg-primary/5 transition-colors"
+                  >
+                    Use Demo
+                  </button>
+                </div>
+                <div className="bg-card rounded-lg px-3 py-2 border border-border space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">{creds.identifierLabel}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-mono text-foreground truncate max-w-[160px]">{creds.identifier}</span>
                       <button
                         type="button"
-                        onClick={() => handleCopy(c.identifier, `id-${r}`)}
+                        onClick={() => handleCopy(creds.identifier, 'id')}
                         className="p-1 rounded hover:bg-secondary transition-colors"
-                        title="Copy identifier"
                       >
-                        {copiedField === `id-${r}` ? (
-                          <CheckCircle size={13} className="text-success" />
-                        ) : (
-                          <Copy size={13} className="text-muted-foreground" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleUseCreds(r)}
-                        className="text-xs font-semibold text-primary hover:underline px-2 py-1 rounded hover:bg-primary/5 transition-colors"
-                      >
-                        Use
+                        {copiedField === 'id' ? <CheckCircle size={12} className="text-success" /> : <Copy size={12} className="text-muted-foreground" />}
                       </button>
                     </div>
                   </div>
-                );
-              })}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Password</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-mono text-foreground">{creds.password}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(creds.password, 'pw')}
+                        className="p-1 rounded hover:bg-secondary transition-colors"
+                      >
+                        {copiedField === 'pw' ? <CheckCircle size={12} className="text-success" /> : <Copy size={12} className="text-muted-foreground" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -249,6 +249,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             collapsed ? 'justify-center' : ''
           }`}
           title={collapsed ? 'Logout' : undefined}
+          onClick={() => { window.location.href = '/login-screen'; }}
         >
           <LogOut size={18} />
           {!collapsed && <span>Logout</span>}

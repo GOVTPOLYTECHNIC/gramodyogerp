@@ -1,12 +1,14 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Download } from 'lucide-react';
-import { mockFeeRecords, FeeRecord } from './feeData';
+import { FeeRecord, mockFeeRecords } from './feeData';
 import FeeKPICards from './FeeKPICards';
 import FeeFilters from './FeeFilters';
 import FeeTable from './FeeTable';
 import RecordPaymentModal from './RecordPaymentModal';
 import FeeReceiptModal from './FeeReceiptModal';
+import EditFeeModal from './EditFeeModal';
+import { getFeeRecords, saveFeeRecords } from '@/lib/studentStore';
 import { toast } from 'sonner';
 
 export default function FeeManagementContent() {
@@ -17,8 +19,14 @@ export default function FeeManagementContent() {
   const [filterMode, setFilterMode] = useState('');
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [receiptRecord, setReceiptRecord] = useState<FeeRecord | null>(null);
+  const [editRecord, setEditRecord] = useState<FeeRecord | null>(null);
   const [page, setPage] = useState(1);
   const perPage = 10;
+
+  // Load from shared store on mount
+  useEffect(() => {
+    setRecords(getFeeRecords());
+  }, []);
 
   const filtered = useMemo(() => {
     return records.filter((r) => {
@@ -39,10 +47,19 @@ export default function FeeManagementContent() {
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
   const handleRecordPayment = (newRecord: FeeRecord) => {
-    // Backend integration point: POST /api/fee-payments
-    setRecords((prev) => [newRecord, ...prev]);
+    const updated = [newRecord, ...records];
+    setRecords(updated);
+    saveFeeRecords(updated);
     setPaymentOpen(false);
     toast.success(`Payment recorded. Receipt ${newRecord.receiptNo} generated.`);
+  };
+
+  const handleSaveEdit = (updated: FeeRecord) => {
+    const newRecords = records.map((r) => (r.id === updated.id ? updated : r));
+    setRecords(newRecords);
+    saveFeeRecords(newRecords);
+    setEditRecord(null);
+    toast.success('Fee record updated successfully');
   };
 
   return (
@@ -89,6 +106,7 @@ export default function FeeManagementContent() {
       <FeeTable
         records={paginated}
         onViewReceipt={setReceiptRecord}
+        onEditRecord={setEditRecord}
         page={page}
         perPage={perPage}
         total={filtered.length}
@@ -108,6 +126,14 @@ export default function FeeManagementContent() {
           open={!!receiptRecord}
           onClose={() => setReceiptRecord(null)}
           record={receiptRecord}
+        />
+      )}
+      {editRecord && (
+        <EditFeeModal
+          open={!!editRecord}
+          onClose={() => setEditRecord(null)}
+          record={editRecord}
+          onSave={handleSaveEdit}
         />
       )}
     </div>

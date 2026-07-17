@@ -1,12 +1,13 @@
 'use client';
 import React from 'react';
-import { Eye, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { Eye, Pencil, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { FeeRecord } from './feeData';
 import Badge from '@/components/ui/Badge';
 
 interface FeeTableProps {
   records: FeeRecord[];
   onViewReceipt: (r: FeeRecord) => void;
+  onEditRecord: (r: FeeRecord) => void;
   page: number;
   perPage: number;
   total: number;
@@ -29,7 +30,7 @@ const modeColor: Record<string, string> = {
 };
 
 export default function FeeTable({
-  records, onViewReceipt,
+  records, onViewReceipt, onEditRecord,
   page, perPage, total, totalPages, onPageChange,
 }: FeeTableProps) {
   if (records.length === 0) {
@@ -138,6 +139,13 @@ export default function FeeTable({
                   </td>
                   <td className="table-td">
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                      <button
+                        onClick={() => onEditRecord(r)}
+                        title="Edit fee record"
+                        className="p-1.5 rounded-lg hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                      >
+                        <Pencil size={14} />
+                      </button>
                       <button
                         onClick={() => onViewReceipt(r)}
                         title="View / Print fee receipt"

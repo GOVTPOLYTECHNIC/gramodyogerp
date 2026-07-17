@@ -1,7 +1,8 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Download } from 'lucide-react';
-import { mockStudents, Student } from './studentData';
+import { Student, mockStudents } from './studentData';
+import { getStudents, saveStudents, deleteStudentAndFees } from '@/lib/studentStore';
 import StudentFilters from './StudentFilters';
 import StudentTable from './StudentTable';
 import AddStudentModal from './AddStudentModal';
@@ -27,6 +28,11 @@ export default function StudentManagementContent() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
 
+  // Load from shared store on mount
+  useEffect(() => {
+    setStudents(getStudents());
+  }, []);
+
   const filtered = useMemo(() => {
     return students.filter((s) => {
       const q = search.toLowerCase();
@@ -50,27 +56,28 @@ export default function StudentManagementContent() {
   const handleDelete = () => {
     if (!deleteStudent) return;
     setDeleteLoading(true);
-    // Backend integration point: DELETE /api/students/:id
     setTimeout(() => {
+      // Delete student AND their fee records from shared store
+      deleteStudentAndFees(deleteStudent.id);
       setStudents((prev) => prev.filter((s) => s.id !== deleteStudent.id));
       setDeleteLoading(false);
       setDeleteStudent(null);
-      toast.success(`Student ${deleteStudent.name} deleted successfully`);
+      toast.success(`Student ${deleteStudent.name} deleted successfully (fees records also removed)`);
     }, 800);
   };
 
   const handleSaveEdit = (updated: Student) => {
-    // Backend integration point: PUT /api/students/:id
-    setStudents((prev) =>
-      prev.map((s) => (s.id === updated.id ? updated : s))
-    );
+    const newStudents = students.map((s) => (s.id === updated.id ? updated : s));
+    setStudents(newStudents);
+    saveStudents(newStudents);
     setEditStudent(null);
     toast.success('Student record updated successfully');
   };
 
   const handleAddStudent = (student: Student) => {
-    // Backend integration point: POST /api/students
-    setStudents((prev) => [student, ...prev]);
+    const newStudents = [student, ...students];
+    setStudents(newStudents);
+    saveStudents(newStudents);
     setAddOpen(false);
     toast.success(`${student.name} admitted successfully`);
   };
@@ -163,7 +170,7 @@ export default function StudentManagementContent() {
         onClose={() => setDeleteStudent(null)}
         onConfirm={handleDelete}
         title="Delete Student Record"
-        description={`Are you sure you want to permanently delete ${deleteStudent?.name}'s record? This action cannot be undone.`}
+        description={`Are you sure you want to permanently delete ${deleteStudent?.name}'s record? Their fee records will also be removed. This action cannot be undone.`}
         confirmLabel="Delete Student"
         loading={deleteLoading}
       />
