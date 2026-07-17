@@ -23,6 +23,7 @@ import {
   Wallet,
   CalendarDays,
   KeyRound,
+  BadgeIndianRupee,
 } from 'lucide-react';
 
 interface NavItem {
@@ -117,6 +118,13 @@ const navItems: NavItem[] = [
     label: 'Staff Payroll',
     href: '/staff-payroll',
     icon: <Wallet size={18} />,
+    group: 'Staff',
+  },
+  {
+    id: 'nav-staff-salary',
+    label: 'Staff Salary',
+    href: '/staff-salary',
+    icon: <BadgeIndianRupee size={18} />,
     group: 'Staff',
   },
   {
