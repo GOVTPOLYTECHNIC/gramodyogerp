@@ -13,20 +13,20 @@ interface FeeReceiptModalProps {
 const schoolFullDetails: Record<string, { name: string; address: string; phone: string; affiliation: string }> = {
   'Rajiv Gandhi Polytechnic': {
     name: 'Rajiv Gandhi Polytechnic',
-    address: 'Gramodyog Sewa Sansthan Campus, Varanasi, Uttar Pradesh — 221001',
-    phone: '0542-2XXXXXX',
+    address: 'Gramodyog Sewa Sansthan Campus Musafirkhana, Amethi, Uttar Pradesh — 227813',
+    phone: '05361-222358',
     affiliation: 'Affiliated to Board of Technical Education, UP',
   },
   'Rajiv Gandhi ITI': {
     name: 'Rajiv Gandhi Industrial Training Institute',
-    address: 'Gramodyog Sewa Sansthan Campus, Varanasi, Uttar Pradesh — 221001',
-    phone: '0542-2XXXXXX',
+    address: 'Gramodyog Sewa Sansthan Campus Musafirkhana, Amethi, Uttar Pradesh — 227813',
+    phone: '05361-222358',
     affiliation: 'Affiliated to NCVT / SCVT, Government of India',
   },
   'GSS Diploma College': {
     name: 'Gramodyog Sewa Sansthan Diploma College',
-    address: 'Gramodyog Sewa Sansthan Campus, Varanasi, Uttar Pradesh — 221001',
-    phone: '0542-2XXXXXX',
+    address: 'Gramodyog Sewa Sansthan Campus Musafirkhana, Amethi, Uttar Pradesh — 227813',
+    phone: '05361-222358',
     affiliation: 'Recognised by Rehabilitation Council of India (RCI)',
   },
 };
