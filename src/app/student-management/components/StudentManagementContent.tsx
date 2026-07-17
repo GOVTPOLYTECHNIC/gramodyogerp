@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Download } from 'lucide-react';
+import { Plus, Download, Upload } from 'lucide-react';
 import { Student } from './studentData';
 import { getStudents, saveStudents, deleteStudentAndFees, getFeeRecords } from '@/lib/studentStore';
 import StudentFilters from './StudentFilters';
@@ -9,6 +9,7 @@ import AddStudentModal from './AddStudentModal';
 import EditStudentModal from './EditStudentModal';
 import GatePassModal from './GatePassModal';
 import IDCardModal from './IDCardModal';
+import CSVImportModal from './CSVImportModal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
 
@@ -21,6 +22,7 @@ export default function StudentManagementContent() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSemester, setFilterSemester] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [editStudent, setEditStudent] = useState<Student | null>(null);
   const [deleteStudent, setDeleteStudent] = useState<Student | null>(null);
   const [gatePassStudent, setGatePassStudent] = useState<Student | null>(null);
@@ -84,6 +86,14 @@ export default function StudentManagementContent() {
     toast.success(`${student.name} admitted successfully`);
   };
 
+  const handleCSVImport = (importedStudents: Student[]) => {
+    const newStudents = [...importedStudents, ...students];
+    setStudents(newStudents);
+    saveStudents(newStudents);
+    setCsvImportOpen(false);
+    toast.success(`${importedStudents.length} student(s) imported successfully via CSV`);
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -98,6 +108,13 @@ export default function StudentManagementContent() {
           <button className="btn-secondary flex items-center gap-2 text-xs h-9">
             <Download size={14} />
             Export
+          </button>
+          <button
+            onClick={() => setCsvImportOpen(true)}
+            className="btn-secondary flex items-center gap-2 text-xs h-9"
+          >
+            <Upload size={14} />
+            Import CSV
           </button>
           <button
             onClick={() => setAddOpen(true)}
@@ -144,6 +161,12 @@ export default function StudentManagementContent() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onAdd={handleAddStudent}
+        existingCount={students.length}
+      />
+      <CSVImportModal
+        open={csvImportOpen}
+        onClose={() => setCsvImportOpen(false)}
+        onImport={handleCSVImport}
         existingCount={students.length}
       />
       {editStudent && (
