@@ -54,7 +54,6 @@ const navItems: NavItem[] = [
     label: 'Fee Management',
     href: '/fee-management',
     icon: <IndianRupee size={18} />,
-    badge: 14,
     group: 'Academics',
   },
   {
