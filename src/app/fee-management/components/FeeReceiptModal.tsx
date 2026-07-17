@@ -38,55 +38,156 @@ export default function FeeReceiptModal({ open, onClose, record }: FeeReceiptMod
   const balance = netFee - record.paidAmount;
 
   const handlePrint = () => {
-    const printContent = printRef.current;
-    if (!printContent) return;
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    const printWindow = window.open('', '_blank', 'width=820,height=700');
     if (!printWindow) return;
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Fee Receipt — ${record.receiptNo}</title>
-          <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: #fff; }
-            .receipt { border: 2px solid #2563eb; border-radius: 8px; overflow: hidden; max-width: 700px; margin: 20px auto; }
-            .header { background: #2563eb; padding: 16px 24px; text-align: center; }
-            .header h1 { color: #fff; font-size: 18px; font-weight: bold; }
-            .header p { color: #bfdbfe; font-size: 12px; margin-top: 2px; }
-            .subheader { background: #7c3aed; padding: 8px 24px; text-align: center; }
-            .subheader p { color: #fff; font-weight: bold; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
-            .meta { padding: 12px 24px; background: #eff6ff; display: flex; flex-wrap: wrap; gap: 16px; border-bottom: 1px solid #e5e7eb; }
-            .meta-item p:first-child { font-size: 10px; color: #6b7280; }
-            .meta-item p:last-child { font-weight: bold; font-size: 13px; }
-            .section { padding: 12px 24px; border-bottom: 1px solid #e5e7eb; }
-            .section-title { font-size: 10px; font-weight: bold; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-            .field p:first-child { font-size: 10px; color: #6b7280; }
-            .field p:last-child { font-weight: 600; font-size: 12px; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th { text-align: left; padding: 6px 0; font-size: 10px; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
-            th:last-child { text-align: right; }
-            td { padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
-            td:last-child { text-align: right; font-weight: 600; }
-            .balance-row td { font-weight: bold; }
-            .footer { padding: 12px 24px; display: flex; justify-content: space-between; align-items: flex-end; }
-            .footer-left { font-size: 10px; color: #6b7280; }
-            .footer-right { text-align: right; font-size: 10px; }
-            .sign-line { border-top: 1px solid #111; padding-top: 4px; width: 140px; }
-            @media print { body { margin: 0; } }
-          </style>
-        </head>
-        <body>
-          ${printContent.innerHTML}
-        </body>
-      </html>
-    `);
+
+    const discountRow = record.discount > 0
+      ? `<tr>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;color:#16a34a;">Discount / Concession</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:#16a34a;">−₹${record.discount.toLocaleString('en-IN')}</td>
+        </tr>`
+      : '';
+
+    const remarksSection = record.remarks
+      ? `<div style="padding:10px 24px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
+          Remarks: <span style="color:#111827;font-weight:500;">${record.remarks}</span>
+        </div>`
+      : '';
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Fee Receipt — ${record.receiptNo}</title>
+  <meta charset="UTF-8"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111827;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    @page{size:A4;margin:15mm 12mm;}
+    @media print{body{margin:0;}.no-print{display:none!important;}}
+  </style>
+</head>
+<body>
+<div style="border:2px solid #2563eb;border-radius:10px;overflow:hidden;max-width:680px;margin:20px auto;">
+
+  <!-- Header -->
+  <div style="background:#2563eb;padding:18px 24px;text-align:center;">
+    <p style="color:#ffffff;font-weight:700;font-size:19px;margin-bottom:3px;">${schoolDetails.name}</p>
+    <p style="color:#bfdbfe;font-size:12px;margin-bottom:2px;">Under: Gramodyog Sewa Sansthan</p>
+    <p style="color:#93c5fd;font-size:11px;">${schoolDetails.affiliation}</p>
+  </div>
+
+  <!-- Sub-header -->
+  <div style="background:#7c3aed;padding:9px 24px;text-align:center;">
+    <p style="color:#ffffff;font-weight:700;font-size:12px;letter-spacing:2px;text-transform:uppercase;">
+      Fee Receipt — Academic Year ${record.academicYear}
+    </p>
+  </div>
+
+  <!-- Receipt Meta -->
+  <div style="padding:14px 24px;background:#eff6ff;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;border-bottom:1px solid #e5e7eb;">
+    <div>
+      <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Receipt No.</p>
+      <p style="font-weight:700;font-size:13px;font-family:monospace;">${record.receiptNo}</p>
+    </div>
+    <div>
+      <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Date of Payment</p>
+      <p style="font-weight:700;font-size:13px;">${record.paymentDate}</p>
+    </div>
+    <div>
+      <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Payment Mode</p>
+      <p style="font-weight:700;font-size:13px;">${record.paymentMode}</p>
+    </div>
+    <div>
+      <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Academic Year</p>
+      <p style="font-weight:700;font-size:13px;">${record.academicYear}</p>
+    </div>
+  </div>
+
+  <!-- Student Details -->
+  <div style="padding:14px 24px;border-bottom:1px solid #e5e7eb;">
+    <p style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Student Details</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div>
+        <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Student Name</p>
+        <p style="font-weight:600;font-size:13px;">${record.studentName}</p>
+      </div>
+      <div>
+        <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Roll Number</p>
+        <p style="font-weight:600;font-size:13px;font-family:monospace;">${record.rollNo}</p>
+      </div>
+      <div>
+        <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Course</p>
+        <p style="font-weight:600;font-size:13px;">${record.course}</p>
+      </div>
+      <div>
+        <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Semester</p>
+        <p style="font-weight:600;font-size:13px;">Semester ${record.semester}</p>
+      </div>
+      <div>
+        <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Institution</p>
+        <p style="font-weight:600;font-size:13px;">${record.school}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fee Breakdown -->
+  <div style="padding:14px 24px;border-bottom:1px solid #e5e7eb;">
+    <p style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Fee Breakdown</p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="border-bottom:2px solid #e5e7eb;">
+          <th style="text-align:left;padding:8px 0;font-size:11px;color:#6b7280;font-weight:600;">Description</th>
+          <th style="text-align:right;padding:8px 0;font-size:11px;color:#6b7280;font-weight:600;">Amount (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">Annual Tuition Fee (${record.academicYear})</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;">₹${record.annualFee.toLocaleString('en-IN')}</td>
+        </tr>
+        ${discountRow}
+        <tr style="background:#f0f9ff;">
+          <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;font-weight:600;">Net Fee Payable</td>
+          <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">₹${netFee.toLocaleString('en-IN')}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">Amount Paid (This Transaction)</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:#2563eb;">₹${record.paidAmount.toLocaleString('en-IN')}</td>
+        </tr>
+        <tr style="background:${balance > 0 ? '#fef2f2' : '#f0fdf4'};">
+          <td style="padding:10px 0;font-weight:700;color:${balance > 0 ? '#dc2626' : '#16a34a'};">
+            ${balance > 0 ? 'Balance Remaining' : 'Fee Status — FULLY PAID'}
+          </td>
+          <td style="padding:10px 0;text-align:right;font-weight:700;color:${balance > 0 ? '#dc2626' : '#16a34a'};">
+            ${balance > 0 ? `₹${balance.toLocaleString('en-IN')}` : '✓ NIL'}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  ${remarksSection}
+
+  <!-- Footer -->
+  <div style="padding:14px 24px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;">
+    <div style="font-size:11px;color:#6b7280;line-height:1.6;">
+      <p>${schoolDetails.address}</p>
+      <p>Phone: ${schoolDetails.phone}</p>
+      <p style="color:#dc2626;font-weight:600;margin-top:6px;">This is a computer-generated receipt. No signature required.</p>
+    </div>
+    <div style="text-align:right;font-size:11px;">
+      <div style="border-top:1px solid #111827;padding-top:5px;width:150px;">
+        <p style="color:#6b7280;">Authorised Signatory</p>
+        <p style="font-weight:600;color:#111827;">Principal / Cashier</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};</script>
+</body>
+</html>`);
     printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 300);
   };
 
   return (

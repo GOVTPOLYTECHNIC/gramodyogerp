@@ -1,30 +1,10 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import {
-  LayoutDashboard,
-  Users,
-  IndianRupee,
-  CalendarCheck,
-  CreditCard,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-  GraduationCap,
-  FileText,
-  Settings,
-  Bell,
-  BarChart2,
-  Scale,
-  TrendingUp,
-  AlertTriangle,
-  Wallet,
-  CalendarDays,
-  KeyRound,
-  BadgeIndianRupee,
-} from 'lucide-react';
+import { LayoutDashboard, Users, IndianRupee, CalendarCheck, CreditCard, LogOut, ChevronLeft, ChevronRight, GraduationCap, FileText, Settings, BarChart2, Scale, TrendingUp, AlertTriangle, Wallet, CalendarDays, KeyRound, BadgeIndianRupee,  } from 'lucide-react';
+import { getRole, clearRole, UserRole, roleRoutes } from '@/lib/roleAccess';
 
 interface NavItem {
   id: string;
@@ -152,6 +132,12 @@ const navItems: NavItem[] = [
 
 const groups = ['Main', 'Academics', 'Documents', 'Reports', 'Staff', 'System'];
 
+const roleLabels: Record<UserRole, { name: string; email: string; initial: string }> = {
+  admin: { name: 'Admin User', email: 'admin@gramodyog.in', initial: 'A' },
+  staff: { name: 'Staff User', email: 'staff.rajiv@gramodyog.in', initial: 'S' },
+  student: { name: 'Student', email: 'RGP-2026-041', initial: 'ST' },
+};
+
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
@@ -159,6 +145,24 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
+  const [role, setRole] = useState<UserRole | null>(null);
+
+  useEffect(() => {
+    setRole(getRole());
+  }, []);
+
+  // Filter nav items based on role
+  const allowedRoutes = role ? roleRoutes[role] : null;
+  const visibleItems = allowedRoutes
+    ? navItems.filter((item) => allowedRoutes.includes(item.href))
+    : navItems;
+
+  const userInfo = role ? roleLabels[role] : roleLabels['admin'];
+
+  const handleLogout = () => {
+    clearRole();
+    window.location.href = '/login-screen';
+  };
 
   return (
     <aside
@@ -188,7 +192,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
         {groups.map((group) => {
-          const items = navItems.filter((n) => n.group === group);
+          const items = visibleItems.filter((n) => n.group === group);
           if (items.length === 0) return null;
           return (
             <div key={`group-${group}`} className="mb-3">
@@ -238,42 +242,37 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 mb-1">
             <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
-              A
+              {userInfo.initial}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground truncate">
-                Admin User
+                {userInfo.name}
               </p>
               <p className="text-xs text-muted-foreground truncate">
-                admin@gramodyog.in
+                {userInfo.email}
               </p>
             </div>
-            <Bell size={14} className="text-muted-foreground" />
           </div>
         )}
-        <button
-          className={`nav-item nav-item-inactive w-full text-danger hover:bg-red-50 hover:text-danger ${
-            collapsed ? 'justify-center' : ''
-          }`}
-          title={collapsed ? 'Logout' : undefined}
-          onClick={() => { window.location.href = '/login-screen'; }}
-        >
-          <LogOut size={18} />
-          {!collapsed && <span>Logout</span>}
-        </button>
+
+        {/* Toggle collapse */}
         <button
           onClick={onToggle}
-          className={`nav-item nav-item-inactive w-full ${
-            collapsed ? 'justify-center' : 'justify-end'
-          }`}
+          className={`nav-item nav-item-inactive w-full ${collapsed ? 'justify-center' : ''}`}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? <ChevronRight size={16} /> : (
-            <>
-              <span className="text-xs text-muted-foreground mr-1">Collapse</span>
-              <ChevronLeft size={16} />
-            </>
-          )}
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          {!collapsed && <span className="flex-1 truncate">Collapse</span>}
+        </button>
+
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          className={`nav-item nav-item-inactive w-full text-danger hover:bg-danger/10 ${collapsed ? 'justify-center' : ''}`}
+          title="Logout"
+        >
+          <LogOut size={18} />
+          {!collapsed && <span className="flex-1 truncate">Logout</span>}
         </button>
       </div>
     </aside>

@@ -19,6 +19,147 @@ const schoolShortFull: Record<string, { short: string; tagline: string }> = {
 export default function IDCardModal({ open, onClose, student }: IDCardModalProps) {
   const schoolInfo = schoolShortFull[student.school] || { short: 'GSS', tagline: student.school };
 
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank', 'width=500,height=700');
+    if (!printWindow) return;
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>ID Card — ${student.name}</title>
+  <meta charset="UTF-8"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;display:flex;flex-direction:column;align-items:center;padding:20px;gap:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    @page{size:85mm 140mm;margin:5mm;}
+    @media print{body{background:#fff;padding:0;}}
+    .card{width:320px;border-radius:16px;overflow:hidden;border:2px solid #2563eb;box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+    .card-header{background:#2563eb;padding:12px 16px;text-align:center;}
+    .card-header h1{color:#fff;font-weight:700;font-size:14px;margin-bottom:2px;}
+    .card-header p{color:#bfdbfe;font-size:11px;}
+    .card-body{background:#fff;padding:16px;display:flex;gap:14px;}
+    .avatar{width:80px;height:96px;border-radius:8px;background:#eff6ff;border:2px solid #e5e7eb;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#2563eb;flex-shrink:0;}
+    .qr{width:80px;height:80px;background:#f3f4f6;border-radius:8px;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;margin-top:8px;}
+    .qr-text{font-size:9px;color:#6b7280;text-align:center;margin-top:4px;}
+    .details{flex:1;}
+    .student-name{font-weight:700;font-size:14px;color:#111827;line-height:1.3;margin-bottom:2px;}
+    .gender{font-size:11px;color:#6b7280;margin-bottom:8px;}
+    .field{margin-bottom:5px;}
+    .field-label{font-size:9px;color:#6b7280;}
+    .field-value{font-size:11px;font-weight:600;color:#111827;}
+    .field-value.mono{font-family:monospace;}
+    .card-footer{background:#7c3aed;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;}
+    .card-footer p{color:#fff;font-size:11px;font-weight:600;}
+    .card-back{width:320px;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;background:#f9fafb;}
+    .back-header{padding:10px 16px;text-align:center;border-bottom:1px solid #e5e7eb;}
+    .back-header p{font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;}
+    .back-body{padding:12px 16px;}
+    .back-row{display:flex;justify-content:space-between;margin-bottom:6px;font-size:11px;}
+    .back-label{color:#6b7280;}
+    .back-value{font-weight:600;color:#111827;}
+    .back-note{border-top:1px solid #e5e7eb;padding-top:8px;margin-top:8px;font-size:10px;color:#6b7280;text-align:center;line-height:1.5;}
+  </style>
+</head>
+<body>
+  <!-- Front -->
+  <div class="card">
+    <div class="card-header">
+      <h1>Gramodyog Sewa Sansthan</h1>
+      <p>${schoolInfo.tagline}</p>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div class="avatar">${student.name.charAt(0)}</div>
+        <div class="qr">
+          <svg width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="18" height="18" rx="2" stroke="#374151" stroke-width="2" fill="none"/>
+            <rect x="6" y="6" width="10" height="10" fill="#374151"/>
+            <rect x="30" y="2" width="18" height="18" rx="2" stroke="#374151" stroke-width="2" fill="none"/>
+            <rect x="34" y="6" width="10" height="10" fill="#374151"/>
+            <rect x="2" y="30" width="18" height="18" rx="2" stroke="#374151" stroke-width="2" fill="none"/>
+            <rect x="6" y="34" width="10" height="10" fill="#374151"/>
+            <rect x="30" y="30" width="4" height="4" fill="#374151"/>
+            <rect x="36" y="30" width="4" height="4" fill="#374151"/>
+            <rect x="42" y="30" width="6" height="4" fill="#374151"/>
+            <rect x="30" y="36" width="4" height="4" fill="#374151"/>
+            <rect x="36" y="36" width="12" height="4" fill="#374151"/>
+            <rect x="30" y="42" width="4" height="6" fill="#374151"/>
+            <rect x="38" y="42" width="10" height="6" fill="#374151"/>
+            <rect x="22" y="2" width="4" height="4" fill="#374151"/>
+            <rect x="22" y="8" width="4" height="4" fill="#374151"/>
+            <rect x="22" y="14" width="4" height="4" fill="#374151"/>
+            <rect x="22" y="22" width="4" height="4" fill="#374151"/>
+            <rect x="2" y="22" width="4" height="4" fill="#374151"/>
+            <rect x="8" y="22" width="4" height="4" fill="#374151"/>
+            <rect x="14" y="22" width="4" height="4" fill="#374151"/>
+          </svg>
+        </div>
+        <p class="qr-text">Scan to verify</p>
+      </div>
+      <div class="details">
+        <p class="student-name">${student.name}</p>
+        <p class="gender">${student.gender}</p>
+        <div class="field">
+          <p class="field-label">Roll No.</p>
+          <p class="field-value mono">${student.rollNo}</p>
+        </div>
+        <div class="field">
+          <p class="field-label">Course</p>
+          <p class="field-value">${student.course}</p>
+        </div>
+        <div class="field">
+          <p class="field-label">Semester</p>
+          <p class="field-value">Sem ${student.semester} · ${student.admissionYear}</p>
+        </div>
+        <div class="field">
+          <p class="field-label">Guardian</p>
+          <p class="field-value">${student.guardianName}</p>
+        </div>
+        <div class="field">
+          <p class="field-label">Phone</p>
+          <p class="field-value mono">${student.phone}</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer">
+      <p>Valid: 2025–26</p>
+      <p>gramodyog.in</p>
+    </div>
+  </div>
+
+  <!-- Back -->
+  <div class="card-back">
+    <div class="back-header"><p>Back of Card</p></div>
+    <div class="back-body">
+      <div class="back-row">
+        <span class="back-label">DOB</span>
+        <span class="back-value">${student.dob}</span>
+      </div>
+      <div class="back-row">
+        <span class="back-label">Category</span>
+        <span class="back-value">${student.category}</span>
+      </div>
+      <div class="back-row">
+        <span class="back-label">Aadhar</span>
+        <span class="back-value" style="font-family:monospace;">${student.aadhar}</span>
+      </div>
+      <div class="back-row" style="flex-direction:column;gap:2px;">
+        <span class="back-label">Address</span>
+        <span class="back-value">${student.address}</span>
+      </div>
+      <div class="back-note">
+        If found, please return to: Gramodyog Sewa Sansthan,<br/>
+        Musafirkhana, Amethi, UP. Contact: 05361-222358
+      </div>
+    </div>
+  </div>
+
+  <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};</script>
+</body>
+</html>`);
+    printWindow.document.close();
+  };
+
   return (
     <Modal open={open} onClose={onClose} title="Student ID Card" subtitle={`${student.name} · ${student.rollNo}`} size="md">
       <div className="flex flex-col items-center gap-5">
@@ -105,8 +246,8 @@ export default function IDCardModal({ open, onClose, student }: IDCardModalProps
               <span className="font-semibold text-foreground">{student.address}</span>
             </div>
             <div className="border-t border-border pt-2 text-muted-foreground text-center leading-relaxed">
-              If found, please return to: Gramodyog Sewa Sansthan, Varanasi, UP.
-              Contact: 0542-XXXXXXX
+              If found, please return to: Gramodyog Sewa Sansthan,
+              Musafirkhana, Amethi, UP. Contact: 05361-222358
             </div>
           </div>
         </div>
@@ -114,7 +255,7 @@ export default function IDCardModal({ open, onClose, student }: IDCardModalProps
         <div className="flex gap-3 w-full justify-end">
           <button onClick={onClose} className="btn-secondary">Close</button>
           <button
-            onClick={() => window.print()}
+            onClick={handlePrint}
             className="btn-primary flex items-center gap-2"
           >
             <Printer size={14} />

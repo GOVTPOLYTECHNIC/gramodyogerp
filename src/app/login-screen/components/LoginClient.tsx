@@ -101,7 +101,18 @@ export default function LoginClient() {
         data.password === creds.password
       ) {
         toast.success(`Welcome back! Logged in as ${creds.label}`);
-        window.location.href = '/';
+        // Save role for access control
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('gramodyog_role', role);
+        }
+        // Redirect based on role
+        if (role === 'staff') {
+          window.location.href = '/staff-attendance';
+        } else if (role === 'student') {
+          window.location.href = '/fee-management';
+        } else {
+          window.location.href = '/';
+        }
       } else {
         toast.error('Invalid credentials — use the demo accounts below to sign in');
       }
