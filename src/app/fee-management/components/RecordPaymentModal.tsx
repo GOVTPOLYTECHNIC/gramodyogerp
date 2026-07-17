@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '@/components/ui/Modal';
-import { FeeRecord, RECEIPT_PREFIX, School } from './feeData';
+import { FeeRecord, RECEIPT_PREFIX, School, mockFeeRecords } from './feeData';
 import { Student } from '@/app/student-management/components/studentData';
 import { getStudents } from '@/lib/studentStore';
 
@@ -11,6 +11,7 @@ interface RecordPaymentModalProps {
   onClose: () => void;
   onRecord: (r: FeeRecord) => void;
   existingCount: number;
+  allFeeRecords?: FeeRecord[];
 }
 
 interface FormValues {
@@ -22,7 +23,7 @@ interface FormValues {
 }
 
 export default function RecordPaymentModal({
-  open, onClose, onRecord, existingCount,
+  open, onClose, onRecord, existingCount, allFeeRecords,
 }: RecordPaymentModalProps) {
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
@@ -74,8 +75,16 @@ export default function RecordPaymentModal({
     if (s) setSelectedStudent(s);
   }, [studentId, students]);
 
+  // Calculate already paid from fee records for this student
+  const feeRecords = allFeeRecords || mockFeeRecords;
+  const alreadyPaid = selectedStudent
+    ? feeRecords
+        .filter((r) => r.studentId === selectedStudent.id)
+        .reduce((sum, r) => sum + r.paidAmount, 0)
+    : 0;
+
   const netFee = selectedStudent ? selectedStudent.totalFees - discountVal : 0;
-  const balance = netFee - paidAmountVal;
+  const balance = netFee - alreadyPaid - paidAmountVal;
 
   const onSubmit = (data: FormValues) => {
     setLoading(true);
@@ -86,11 +95,11 @@ export default function RecordPaymentModal({
     const paid = Number(data.paidAmount);
     const disc = Number(data.discount);
     const net = s.totalFees - disc;
-    const bal = net - paid;
+    const bal = net - alreadyPaid - paid;
 
     let status: FeeRecord['status'] = 'Pending';
-    if (paid >= net) status = 'Paid';
-    else if (paid > 0) status = 'Partial';
+    if (alreadyPaid + paid >= net) status = 'Paid';
+    else if (alreadyPaid + paid > 0) status = 'Partial';
 
     const today = new Date();
     const paymentDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
@@ -173,8 +182,8 @@ export default function RecordPaymentModal({
             </div>
             <div>
               <p className="text-muted-foreground">Already Paid</p>
-              <p className="font-semibold text-foreground font-tabular">
-                ₹{selectedStudent.paidFees.toLocaleString('en-IN')}
+              <p className="font-semibold text-emerald-600 font-tabular">
+                ₹{alreadyPaid.toLocaleString('en-IN')}
               </p>
             </div>
             <div>
@@ -267,6 +276,12 @@ export default function RecordPaymentModal({
             <div className="flex justify-between border-t border-border pt-1.5">
               <span className="text-muted-foreground">Net Payable</span>
               <span className="font-tabular font-bold">₹{netFee.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Already Paid</span>
+              <span className="font-tabular font-semibold text-emerald-600">
+                ₹{alreadyPaid.toLocaleString('en-IN')}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Amount Paying Now</span>

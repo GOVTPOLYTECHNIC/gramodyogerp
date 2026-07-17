@@ -1,9 +1,8 @@
 'use client';
-import React from 'react';
+import React, { useRef } from 'react';
 import Modal from '@/components/ui/Modal';
 import { FeeRecord } from './feeData';
 import { Printer } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface FeeReceiptModalProps {
   open: boolean;
@@ -33,19 +32,72 @@ const schoolFullDetails: Record<string, { name: string; address: string; phone: 
 };
 
 export default function FeeReceiptModal({ open, onClose, record }: FeeReceiptModalProps) {
+  const printRef = useRef<HTMLDivElement>(null);
   const schoolDetails = schoolFullDetails[record.school] || schoolFullDetails['Rajiv Gandhi Polytechnic'];
   const netFee = record.annualFee - record.discount;
   const balance = netFee - record.paidAmount;
+
+  const handlePrint = () => {
+    const printContent = printRef.current;
+    if (!printContent) return;
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Fee Receipt — ${record.receiptNo}</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: #fff; }
+            .receipt { border: 2px solid #2563eb; border-radius: 8px; overflow: hidden; max-width: 700px; margin: 20px auto; }
+            .header { background: #2563eb; padding: 16px 24px; text-align: center; }
+            .header h1 { color: #fff; font-size: 18px; font-weight: bold; }
+            .header p { color: #bfdbfe; font-size: 12px; margin-top: 2px; }
+            .subheader { background: #7c3aed; padding: 8px 24px; text-align: center; }
+            .subheader p { color: #fff; font-weight: bold; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+            .meta { padding: 12px 24px; background: #eff6ff; display: flex; flex-wrap: wrap; gap: 16px; border-bottom: 1px solid #e5e7eb; }
+            .meta-item p:first-child { font-size: 10px; color: #6b7280; }
+            .meta-item p:last-child { font-weight: bold; font-size: 13px; }
+            .section { padding: 12px 24px; border-bottom: 1px solid #e5e7eb; }
+            .section-title { font-size: 10px; font-weight: bold; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+            .field p:first-child { font-size: 10px; color: #6b7280; }
+            .field p:last-child { font-weight: 600; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { text-align: left; padding: 6px 0; font-size: 10px; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
+            th:last-child { text-align: right; }
+            td { padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+            td:last-child { text-align: right; font-weight: 600; }
+            .balance-row td { font-weight: bold; }
+            .footer { padding: 12px 24px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .footer-left { font-size: 10px; color: #6b7280; }
+            .footer-right { text-align: right; font-size: 10px; }
+            .sign-line { border-top: 1px solid #111; padding-top: 4px; width: 140px; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 300);
+  };
 
   return (
     <Modal open={open} onClose={onClose} title="Fee Receipt" subtitle={`Receipt No: ${record.receiptNo}`} size="xl">
       <div className="space-y-5">
         {/* Receipt Document */}
-        <div className="border-2 border-primary rounded-xl overflow-hidden">
+        <div ref={printRef} className="border-2 border-primary rounded-xl overflow-hidden">
           {/* Header */}
           <div className="bg-primary px-6 py-4 text-center">
             <p className="text-white font-bold text-xl">{schoolDetails.name}</p>
-            <p className="text-blue-200 text-sm mt-0.5">Under: Gramodyog Sewa Sansthan, Varanasi</p>
+            <p className="text-blue-200 text-sm mt-0.5">Under: Gramodyog Sewa Sansthan</p>
             <p className="text-blue-300 text-xs mt-0.5">{schoolDetails.affiliation}</p>
           </div>
 
@@ -181,7 +233,7 @@ export default function FeeReceiptModal({ open, onClose, record }: FeeReceiptMod
         <div className="flex justify-end gap-3">
           <button onClick={onClose} className="btn-secondary">Close</button>
           <button
-            onClick={() => toast.success(`Receipt ${record.receiptNo} sent to printer`)}
+            onClick={handlePrint}
             className="btn-primary flex items-center gap-2"
           >
             <Printer size={14} />

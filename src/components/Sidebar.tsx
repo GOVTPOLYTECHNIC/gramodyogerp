@@ -122,7 +122,7 @@ const navItems: NavItem[] = [
   },
   {
     id: 'nav-staff-salary',
-    label: 'Staff Salary',
+    label: 'Staff Salary Management',
     href: '/staff-salary',
     icon: <BadgeIndianRupee size={18} />,
     group: 'Staff',

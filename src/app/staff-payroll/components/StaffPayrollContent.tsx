@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { Wallet, Search, FileText } from 'lucide-react';
-import { mockStaff, computePayroll, MONTHS, StaffMember } from './payrollData';
+import { Wallet, Search, FileText, Plus, Trash2, X } from 'lucide-react';
+import { mockStaff as initialMockStaff, computePayroll, MONTHS, StaffMember } from './payrollData';
 import SalarySlipModal from './SalarySlipModal';
 
 const COLLEGES = [
@@ -33,15 +33,41 @@ const fmt = (n: number) =>
 const CURRENT_YEAR = '2026';
 const CURRENT_MONTH = 'July';
 
+const ROLES = ['Principal', 'HOD', 'Lecturer', 'Instructor', 'Lab Assistant', 'Clerk', 'Peon'] as const;
+
+interface AddStaffForm {
+  name: string;
+  empId: string;
+  college: string;
+  department: string;
+  role: string;
+  basicSalary: string;
+  hra: string;
+  ta: string;
+  da: string;
+  pf: string;
+  tds: string;
+}
+
+const emptyForm: AddStaffForm = {
+  name: '', empId: '', college: 'Rajiv Gandhi Polytechnic', department: '',
+  role: 'Lecturer', basicSalary: '', hra: '', ta: '', da: '', pf: '', tds: '',
+};
+
 export default function StaffPayrollContent() {
+  const [staffList, setStaffList] = useState<StaffMember[]>(initialMockStaff);
   const [search, setSearch] = useState('');
   const [college, setCollege] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState(CURRENT_MONTH);
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const [slipStaff, setSlipStaff] = useState<StaffMember | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [form, setForm] = useState<AddStaffForm>(emptyForm);
+  const [formError, setFormError] = useState('');
 
   const filtered = useMemo(() => {
-    return mockStaff.filter((s) => {
+    return staffList.filter((s) => {
       const matchSearch =
         search === '' ||
         s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -49,7 +75,7 @@ export default function StaffPayrollContent() {
       const matchCollege = college === 'All' || s.college === college;
       return matchSearch && matchCollege;
     });
-  }, [search, college]);
+  }, [search, college, staffList]);
 
   const totals = useMemo(() => {
     return filtered.reduce(
@@ -64,6 +90,40 @@ export default function StaffPayrollContent() {
       { gross: 0, deductions: 0, net: 0 }
     );
   }, [filtered]);
+
+  const handleAddStaff = () => {
+    if (!form.name.trim() || !form.empId.trim() || !form.department.trim() || !form.basicSalary) {
+      setFormError('Name, Employee ID, Department and Basic Salary are required.');
+      return;
+    }
+    const newStaff: StaffMember = {
+      id: `staff-${Date.now()}`,
+      empId: form.empId.trim(),
+      name: form.name.trim(),
+      college: form.college as StaffMember['college'],
+      department: form.department.trim(),
+      role: form.role as StaffMember['role'],
+      basicSalary: Number(form.basicSalary) || 0,
+      hra: Number(form.hra) || 0,
+      ta: Number(form.ta) || 0,
+      da: Number(form.da) || 0,
+      pf: Number(form.pf) || 0,
+      tds: Number(form.tds) || 0,
+      otherDeductions: 0,
+      joiningDate: new Date().toLocaleDateString('en-IN'),
+      bankAccount: '',
+      ifsc: '',
+    };
+    setStaffList((prev) => [...prev, newStaff]);
+    setShowAddModal(false);
+    setForm(emptyForm);
+    setFormError('');
+  };
+
+  const handleDelete = (id: string) => {
+    setStaffList((prev) => prev.filter((s) => s.id !== id));
+    setDeleteConfirmId(null);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -80,7 +140,6 @@ export default function StaffPayrollContent() {
             </p>
           </div>
         </div>
-        {/* Month/Year Selector */}
         <div className="flex items-center gap-2">
           <select
             value={selectedMonth}
@@ -100,6 +159,13 @@ export default function StaffPayrollContent() {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
+          <button
+            onClick={() => { setShowAddModal(true); setForm(emptyForm); setFormError(''); }}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus size={15} />
+            Add Staff
+          </button>
         </div>
       </div>
 
@@ -160,7 +226,7 @@ export default function StaffPayrollContent() {
                 <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Gross</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-red-600">Deductions</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-emerald-600">Net Pay</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground">Slip</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -185,13 +251,22 @@ export default function StaffPayrollContent() {
                     <td className="px-4 py-3 text-right text-xs font-semibold text-red-600">₹{deductions.toLocaleString('en-IN')}</td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-emerald-700">₹{net.toLocaleString('en-IN')}</td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => setSlipStaff(s)}
-                        className="flex items-center gap-1 mx-auto px-2.5 py-1 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20 transition-colors"
-                      >
-                        <FileText size={12} />
-                        View
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => setSlipStaff(s)}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20 transition-colors"
+                        >
+                          <FileText size={12} />
+                          View
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(s.id)}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete staff"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -225,6 +300,133 @@ export default function StaffPayrollContent() {
           year={selectedYear}
           onClose={() => setSlipStaff(null)}
         />
+      )}
+
+      {/* Delete Confirm Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-base font-bold text-foreground mb-2">Delete Staff Member?</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              This will remove the staff member from payroll. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirmId)}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Staff Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-card border border-border rounded-xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="text-base font-bold text-foreground">Add Staff Member</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {formError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Full Name *</label>
+                  <input type="text" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="e.g. Ramesh Kumar Sharma" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Employee ID *</label>
+                  <input type="text" value={form.empId} onChange={(e) => setForm(f => ({ ...f, empId: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="e.g. RGP-EMP-010" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">College *</label>
+                  <select value={form.college} onChange={(e) => setForm(f => ({ ...f, college: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="Rajiv Gandhi Polytechnic">Rajiv Gandhi Polytechnic</option>
+                    <option value="Rajiv Gandhi ITI">Rajiv Gandhi ITI</option>
+                    <option value="GSS Diploma College">GSS Diploma College</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Department *</label>
+                  <input type="text" value={form.department} onChange={(e) => setForm(f => ({ ...f, department: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="e.g. Civil Engineering" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Role *</label>
+                  <select value={form.role} onChange={(e) => setForm(f => ({ ...f, role: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Basic Salary (₹) *</label>
+                  <input type="number" value={form.basicSalary} onChange={(e) => setForm(f => ({ ...f, basicSalary: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="e.g. 30000" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">HRA (₹)</label>
+                  <input type="number" value={form.hra} onChange={(e) => setForm(f => ({ ...f, hra: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">TA (₹)</label>
+                  <input type="number" value={form.ta} onChange={(e) => setForm(f => ({ ...f, ta: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">DA (₹)</label>
+                  <input type="number" value={form.da} onChange={(e) => setForm(f => ({ ...f, da: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">PF Deduction (₹)</label>
+                  <input type="number" value={form.pf} onChange={(e) => setForm(f => ({ ...f, pf: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">TDS Deduction (₹)</label>
+                  <input type="number" value={form.tds} onChange={(e) => setForm(f => ({ ...f, tds: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="0" />
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end pt-2 border-t border-border">
+                <button onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors">
+                  Cancel
+                </button>
+                <button onClick={handleAddStaff}
+                  className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                  Add Staff
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

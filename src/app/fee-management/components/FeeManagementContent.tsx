@@ -120,6 +120,7 @@ export default function FeeManagementContent() {
         onClose={() => setPaymentOpen(false)}
         onRecord={handleRecordPayment}
         existingCount={records.length}
+        allFeeRecords={records}
       />
       {receiptRecord && (
         <FeeReceiptModal

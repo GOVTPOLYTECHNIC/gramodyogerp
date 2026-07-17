@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { CalendarDays, CheckCircle2, XCircle, Clock, Search, ChevronDown, ChevronUp, User, Building2,  } from 'lucide-react';
+import { CalendarDays, CheckCircle2, XCircle, Clock, Search, ChevronDown, ChevronUp, Building2, Trash2 } from 'lucide-react';
 import {
   mockLeaveApplications,
   LEAVE_TYPE_COLORS,
@@ -28,6 +28,7 @@ export default function LeaveManagementContent() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [remarksMap, setRemarksMap] = useState<Record<string, string>>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return applications.filter((a) => {
@@ -60,6 +61,12 @@ export default function LeaveManagementContent() {
       )
     );
     setExpandedId(null);
+  };
+
+  const handleDelete = (id: string) => {
+    setApplications((prev) => prev.filter((a) => a.id !== id));
+    setDeleteConfirmId(null);
+    if (expandedId === id) setExpandedId(null);
   };
 
   return (
@@ -124,7 +131,7 @@ export default function LeaveManagementContent() {
               onClick={() => setStatusFilter(s)}
               className={`px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
                 statusFilter === s
-                  ? 'bg-primary text-white' :'bg-muted text-muted-foreground hover:bg-muted/80'
+                  ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
               {s}
@@ -148,44 +155,59 @@ export default function LeaveManagementContent() {
                 className="bg-card border border-border rounded-xl overflow-hidden"
               >
                 {/* Card Header */}
-                <div
-                  className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors"
-                  onClick={() => setExpandedId(isExpanded ? null : app.id)}
-                >
-                  {/* Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
-                    {app.staffName.charAt(0)}
+                <div className="flex items-center gap-4 px-5 py-4">
+                  {/* Clickable area */}
+                  <div
+                    className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setExpandedId(isExpanded ? null : app.id)}
+                  >
+                    {/* Avatar */}
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
+                      {app.staffName.charAt(0)}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-foreground text-sm">{app.staffName}</p>
+                        <span className="text-xs text-muted-foreground">{app.empId}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${LEAVE_TYPE_COLORS[app.leaveType]}`}>
+                          {app.leaveType}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Building2 size={11} />
+                          {COLLEGE_SHORT[app.college]} · {app.department}
+                        </span>
+                        <span>{app.fromDate} → {app.toDate}</span>
+                        <span className="font-medium">{app.days} day{app.days !== 1 ? 's' : ''}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-foreground text-sm">{app.staffName}</p>
-                      <span className="text-xs text-muted-foreground">{app.empId}</span>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${LEAVE_TYPE_COLORS[app.leaveType]}`}>
-                        {app.leaveType}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
-                      <span className="flex items-center gap-1">
-                        <Building2 size={11} />
-                        {COLLEGE_SHORT[app.college]} · {app.department}
-                      </span>
-                      <span>{app.fromDate} → {app.toDate}</span>
-                      <span className="font-medium">{app.days} day{app.days !== 1 ? 's' : ''}</span>
-                    </div>
-                  </div>
-
-                  {/* Status + Toggle */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
+                  {/* Status + Actions */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[app.status]}`}>
                       {app.status}
                     </span>
-                    {isExpanded ? (
-                      <ChevronUp size={16} className="text-muted-foreground" />
-                    ) : (
-                      <ChevronDown size={16} className="text-muted-foreground" />
-                    )}
+                    <button
+                      onClick={() => setDeleteConfirmId(app.id)}
+                      className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete application"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    <button
+                      onClick={() => setExpandedId(isExpanded ? null : app.id)}
+                      className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {isExpanded ? (
+                        <ChevronUp size={16} />
+                      ) : (
+                        <ChevronDown size={16} />
+                      )}
+                    </button>
                   </div>
                 </div>
 
@@ -262,6 +284,32 @@ export default function LeaveManagementContent() {
           })
         )}
       </div>
+
+      {/* Delete Confirm Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-base font-bold text-foreground mb-2">Delete Leave Application?</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              This will permanently remove this leave application. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirmId)}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
