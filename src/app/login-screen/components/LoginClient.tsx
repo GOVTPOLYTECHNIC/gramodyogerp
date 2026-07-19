@@ -56,23 +56,36 @@ export default function LoginClient() {
     formState: { errors },
   } = useForm<LoginForm>({ defaultValues: { remember: false } });
 
-  const onSubmit = (data: LoginForm) => {
+ const onSubmit = async (data: LoginForm) => {
+  try {
     setLoading(true);
-    const creds = mockCredentials[role];
-    // Backend integration point: POST /api/auth/login with { role, identifier, password }
-    setTimeout(() => {
-      setLoading(false);
-      if (
-        data.identifier === creds.identifier &&
-        data.password === creds.password
-      ) {
-        toast.success(`Welcome back! Logged in as ${creds.label}`);
-        window.location.href = '/';
-      } else {
-        toast.error('Invalid credentials — use the demo accounts below to sign in');
-      }
-    }, 1200);
-  };
+
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        identifier: data.identifier,
+        password: data.password,
+      }),
+    });
+
+    const result = await res.json();
+
+    if (result.success) {
+      toast.success("Login Successful");
+      window.location.href = "/";
+    } else {
+      toast.error(result.message || "Invalid credentials");
+    }
+  } catch (error) {
+    console.error(error);
+    toast.error("Server Error");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleUseCreds = (r: Role) => {
     const c = mockCredentials[r];
