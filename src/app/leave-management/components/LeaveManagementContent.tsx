@@ -93,11 +93,15 @@ export default function LeaveManagementContent() {
   };
 
   const handleDelete = async (id: string) => {
-    // Soft delete by filtering from UI (no delete endpoint needed for leave)
-    setApplications((prev) => prev.filter((a) => a.id !== id));
-    setDeleteConfirmId(null);
-    if (expandedId === id) setExpandedId(null);
-    toast.success('Leave application removed');
+    try {
+      await leaveService.delete(id);
+      setApplications((prev) => prev.filter((a) => a.id !== id));
+      setDeleteConfirmId(null);
+      if (expandedId === id) setExpandedId(null);
+      toast.success('Leave application deleted');
+    } catch (e: any) {
+      toast.error('Delete failed: ' + e.message);
+    }
   };
 
   return (

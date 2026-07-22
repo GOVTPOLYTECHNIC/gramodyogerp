@@ -140,31 +140,69 @@ export default function StaffSalaryContent() {
     setShowModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim() || !form.empId.trim() || !form.department.trim() || !form.basicSalary) {
       setFormError('Name, Employee ID, Department and Basic Salary are required.');
       return;
     }
-    if (editingStaff) {
-      setStaffList(prev => prev.map(s => s.id === editingStaff.id ? {
-        ...s,
-        name: form.name.trim(), empId: form.empId.trim(),
-        college: form.college as SalaryStaff['college'], department: form.department.trim(),
-        designation: form.designation, basicSalary: Number(form.basicSalary) || 0,
-        hra: Number(form.hra) || 0, ta: Number(form.ta) || 0, da: Number(form.da) || 0,
-        pf: Number(form.pf) || 0, tds: Number(form.tds) || 0, bankName: form.bankName.trim(),
-      } : s));
-    } else {
-      const newStaff: SalaryStaff = {
-        id: `ss-${Date.now()}`, empId: form.empId.trim(), name: form.name.trim(),
-        college: form.college as SalaryStaff['college'], department: form.department.trim(),
-        designation: form.designation, basicSalary: Number(form.basicSalary) || 0,
-        hra: Number(form.hra) || 0, ta: Number(form.ta) || 0, da: Number(form.da) || 0,
-        pf: Number(form.pf) || 0, tds: Number(form.tds) || 0, otherDeductions: 0,
-        joiningDate: new Date().toLocaleDateString('en-IN'), bankAccount: '', ifsc: '',
-        bankName: form.bankName.trim() || 'N/A',
-      };
-      setStaffList(prev => [...prev, newStaff]);
+    const staffData = {
+      empId: form.empId.trim(),
+      name: form.name.trim(),
+      college: form.college,
+      department: form.department.trim(),
+      role: form.designation,
+      designation: form.designation,
+      basicSalary: Number(form.basicSalary) || 0,
+      hra: Number(form.hra) || 0,
+      ta: Number(form.ta) || 0,
+      da: Number(form.da) || 0,
+      pf: Number(form.pf) || 0,
+      tds: Number(form.tds) || 0,
+      otherDeductions: 0,
+      joiningDate: new Date().toLocaleDateString('en-IN'),
+      bankAccount: '',
+      ifsc: '',
+      bankName: form.bankName.trim() || '',
+    };
+    try {
+      if (editingStaff) {
+        const result = await staffService.update(editingStaff.id, staffData);
+        if (result) {
+          setStaffList(prev => prev.map(s => s.id === editingStaff.id ? {
+            ...s, ...(result as any),
+            designation: (result as any).designation || (result as any).role,
+          } : s));
+          toast.success('Staff member updated successfully');
+        }
+      } else {
+        const result = await staffService.create(staffData);
+        if (result) {
+          const mapped: SalaryStaff = {
+            id: (result as any).id,
+            empId: (result as any).empId,
+            name: (result as any).name,
+            college: (result as any).college as SalaryStaff['college'],
+            department: (result as any).department,
+            designation: (result as any).designation || (result as any).role,
+            basicSalary: (result as any).basicSalary,
+            hra: (result as any).hra,
+            ta: (result as any).ta,
+            da: (result as any).da,
+            pf: (result as any).pf,
+            tds: (result as any).tds,
+            otherDeductions: (result as any).otherDeductions,
+            joiningDate: (result as any).joiningDate,
+            bankAccount: (result as any).bankAccount,
+            ifsc: (result as any).ifsc,
+            bankName: (result as any).bankName,
+          };
+          setStaffList(prev => [...prev, mapped]);
+          toast.success('Staff member added successfully');
+        }
+      }
+    } catch (e: any) {
+      toast.error('Failed to save staff: ' + e.message);
+      return;
     }
     setShowModal(false);
     setEditingStaff(null);
@@ -172,9 +210,15 @@ export default function StaffSalaryContent() {
     setFormError('');
   };
 
-  const handleDelete = (id: string) => {
-    setStaffList(prev => prev.filter(s => s.id !== id));
-    setDeleteConfirmId(null);
+  const handleDelete = async (id: string) => {
+    try {
+      await staffService.delete(id);
+      setStaffList(prev => prev.filter(s => s.id !== id));
+      setDeleteConfirmId(null);
+      toast.success('Staff member removed');
+    } catch (e: any) {
+      toast.error('Delete failed: ' + e.message);
+    }
   };
 
   return (

@@ -563,6 +563,12 @@ export const leaveService = {
     }
     return mapLeave(data);
   },
+
+  async delete(id: string) {
+    const supabase = createClient();
+    const { error } = await supabase.from('leave_applications').delete().eq('id', id);
+    if (error && isSchemaError(error)) throw error;
+  },
 };
 
 function mapLeave(row: any) {
