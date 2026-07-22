@@ -1,13 +1,15 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { IndianRupee, Search, FileText, Users, TrendingDown, Wallet, CalendarCheck, History, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import {
-  salaryStaff as initialSalaryStaff, attendanceRecords, MONTHS, COLLEGE_SHORT, COLLEGE_COLORS,
+  attendanceRecords, MONTHS, COLLEGE_SHORT, COLLEGE_COLORS,
   computeAttendancePayroll,
 } from './salaryData';
+import { staffService } from '@/lib/supabase/services';
 import SalarySlipModal from './SalarySlipModal';
 import PaymentHistoryTab from './PaymentHistoryTab';
 import type { SalaryStaff } from './salaryData';
+import { toast } from 'sonner';
 
 const COLLEGES = ['All', 'Rajiv Gandhi Polytechnic', 'Rajiv Gandhi ITI', 'GSS Diploma College'];
 const CURRENT_YEAR = '2026';
@@ -31,7 +33,8 @@ const emptyForm: StaffForm = {
 };
 
 export default function StaffSalaryContent() {
-  const [staffList, setStaffList] = useState<SalaryStaff[]>(initialSalaryStaff);
+  const [staffList, setStaffList] = useState<SalaryStaff[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('payroll');
   const [search, setSearch] = useState('');
   const [college, setCollege] = useState('All');
@@ -43,6 +46,42 @@ export default function StaffSalaryContent() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [form, setForm] = useState<StaffForm>(emptyForm);
   const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    loadStaff();
+  }, []);
+
+  async function loadStaff() {
+    setLoading(true);
+    try {
+      const data = await staffService.getAll();
+      // Map staff data to SalaryStaff shape
+      const mapped = (data as any[]).map((s) => ({
+        id: s.id,
+        empId: s.empId,
+        name: s.name,
+        college: s.college,
+        department: s.department,
+        designation: s.designation || s.role,
+        basicSalary: s.basicSalary,
+        hra: s.hra,
+        ta: s.ta,
+        da: s.da,
+        pf: s.pf,
+        tds: s.tds,
+        otherDeductions: s.otherDeductions,
+        joiningDate: s.joiningDate,
+        bankAccount: s.bankAccount,
+        ifsc: s.ifsc,
+        bankName: s.bankName,
+      }));
+      setStaffList(mapped as SalaryStaff[]);
+    } catch (e: any) {
+      toast.error('Failed to load staff: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     return staffList.filter((s) => {

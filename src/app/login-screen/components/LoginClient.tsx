@@ -6,7 +6,8 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import AppLogo from '@/components/ui/AppLogo';
 
-import { getStudents } from '@/lib/studentStore';
+import { studentService } from '@/lib/supabase/services';
+
 
 
 type Role = 'admin' | 'staff' | 'student';
@@ -94,10 +95,9 @@ export default function LoginClient() {
     if (!role) return;
     setLoading(true);
 
-    setTimeout(() => {
-      setLoading(false);
-
-      if (role === 'admin') {
+    if (role === 'admin') {
+      setTimeout(() => {
+        setLoading(false);
         if (
           data.identifier === adminCredentials.identifier &&
           data.password === adminCredentials.password
@@ -111,10 +111,13 @@ export default function LoginClient() {
         } else {
           toast.error('Invalid credentials. Please check your email and password.');
         }
-        return;
-      }
+      }, 1200);
+      return;
+    }
 
-      if (role === 'staff') {
+    if (role === 'staff') {
+      setTimeout(() => {
+        setLoading(false);
         if (
           data.identifier === staffCredentials.identifier &&
           data.password === staffCredentials.password
@@ -128,26 +131,23 @@ export default function LoginClient() {
         } else {
           toast.error('Invalid credentials. Please check your email and password.');
         }
-        return;
-      }
+      }, 1200);
+      return;
+    }
 
-      if (role === 'student') {
-        const students = getStudents();
-        const matchedStudent = students.find(
-          (s) => s.rollNo.toLowerCase() === data.identifier.toLowerCase()
-        );
-
+    if (role === 'student') {
+      // Fetch from Supabase
+      studentService.getByRollNo(data.identifier.trim()).then((matchedStudent) => {
+        setLoading(false);
         if (!matchedStudent) {
           toast.error('Roll number not found. Please check and try again.');
           return;
         }
-
         const expectedPassword = getStudentPassword(matchedStudent.rollNo, matchedStudent.dob);
         if (data.password !== expectedPassword) {
           toast.error('Invalid password. Please check and try again.');
           return;
         }
-
         toast.success(`Welcome, ${matchedStudent.name}!`);
         if (typeof window !== 'undefined') {
           localStorage.setItem('gramodyog_role', 'student');
@@ -155,8 +155,14 @@ export default function LoginClient() {
           localStorage.setItem('gramodyog_student_roll', matchedStudent.rollNo);
         }
         window.location.href = '/fee-management';
-      }
-    }, 1200);
+      }).catch(() => {
+        setLoading(false);
+        toast.error('Login failed. Please try again.');
+      });
+      return;
+    }
+
+    setLoading(false);
   };
 
   const handleSelectRole = (r: Role) => {

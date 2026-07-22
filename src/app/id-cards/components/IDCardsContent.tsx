@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, CreditCard } from 'lucide-react';
 import { Student } from '@/app/student-management/components/studentData';
-import { getStudents } from '@/lib/studentStore';
+import { studentService } from '@/lib/supabase/services';
 import IDCardModal from '@/app/student-management/components/IDCardModal';
 
 export default function IDCardsContent() {
@@ -17,7 +17,7 @@ export default function IDCardsContent() {
     const roll = typeof window !== 'undefined' ? localStorage.getItem('gramodyog_student_roll') : null;
     setStudentRole(role);
     setStudentRoll(roll);
-    setStudents(getStudents());
+    studentService.getAll().then((data) => setStudents(data as Student[])).catch(() => {});
   }, []);
 
   const filtered = students.filter((s) => {

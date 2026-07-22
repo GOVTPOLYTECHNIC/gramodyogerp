@@ -1,12 +1,13 @@
 'use client';
-import React, { useState, useMemo } from 'react';
-import { CalendarDays, CheckCircle2, XCircle, Clock, Search, ChevronDown, ChevronUp, Building2, Trash2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { CalendarDays, CheckCircle2, XCircle, Clock, Search, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import {
-  mockLeaveApplications,
   LEAVE_TYPE_COLORS,
   STATUS_COLORS,
   LeaveApplication,
 } from './leaveData';
+import { leaveService } from '@/lib/supabase/services';
+import { toast } from 'sonner';
 
 const COLLEGES = [
   'All',
@@ -21,14 +22,37 @@ const COLLEGE_SHORT: Record<string, string> = {
   'GSS Diploma College': 'GSS',
 };
 
+const COLLEGE_COLORS: Record<string, string> = {
+  'Rajiv Gandhi Polytechnic': 'bg-blue-100 text-blue-700',
+  'Rajiv Gandhi ITI': 'bg-purple-100 text-purple-700',
+  'GSS Diploma College': 'bg-teal-100 text-teal-700',
+};
+
 export default function LeaveManagementContent() {
-  const [applications, setApplications] = useState<LeaveApplication[]>(mockLeaveApplications);
+  const [applications, setApplications] = useState<LeaveApplication[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [college, setCollege] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [remarksMap, setRemarksMap] = useState<Record<string, string>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadLeaves();
+  }, []);
+
+  async function loadLeaves() {
+    setLoading(true);
+    try {
+      const data = await leaveService.getAll();
+      setApplications(data as LeaveApplication[]);
+    } catch (e: any) {
+      toast.error('Failed to load leave applications: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     return applications.filter((a) => {
@@ -46,27 +70,34 @@ export default function LeaveManagementContent() {
   const approved = applications.filter((a) => a.status === 'Approved').length;
   const rejected = applications.filter((a) => a.status === 'Rejected').length;
 
-  const handleAction = (id: string, action: 'Approved' | 'Rejected') => {
-    setApplications((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? {
-              ...a,
-              status: action,
-              approvedBy: 'Admin User',
-              approvedOn: new Date().toLocaleDateString('en-IN'),
-              remarks: remarksMap[id] || '',
-            }
-          : a
-      )
-    );
+  const handleAction = async (id: string, action: 'Approved' | 'Rejected') => {
+    const app = applications.find((a) => a.id === id);
+    if (!app) return;
+    const updated = {
+      ...app,
+      status: action as LeaveApplication['status'],
+      approvedBy: 'Admin User',
+      approvedOn: new Date().toLocaleDateString('en-IN'),
+      remarks: remarksMap[id] || '',
+    };
+    try {
+      const result = await leaveService.update(id, updated);
+      if (result) {
+        setApplications((prev) => prev.map((a) => (a.id === id ? (result as LeaveApplication) : a)));
+        toast.success(`Leave ${action.toLowerCase()} successfully`);
+      }
+    } catch (e: any) {
+      toast.error('Action failed: ' + e.message);
+    }
     setExpandedId(null);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    // Soft delete by filtering from UI (no delete endpoint needed for leave)
     setApplications((prev) => prev.filter((a) => a.id !== id));
     setDeleteConfirmId(null);
     if (expandedId === id) setExpandedId(null);
+    toast.success('Leave application removed');
   };
 
   return (
@@ -79,7 +110,7 @@ export default function LeaveManagementContent() {
         <div>
           <h1 className="text-xl font-bold text-foreground">Leave Management</h1>
           <p className="text-sm text-muted-foreground">
-            Staff leave applications and admin approval workflow
+            {loading ? 'Loading...' : `${applications.length} applications · ${pending} pending`}
           </p>
         </div>
       </div>
@@ -87,14 +118,12 @@ export default function LeaveManagementContent() {
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Pending Approval', value: pending, icon: <Clock size={18} />, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
-          { label: 'Approved', value: approved, icon: <CheckCircle2 size={18} />, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-          { label: 'Rejected', value: rejected, icon: <XCircle size={18} />, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
-        ].map((k, i) => (
-          <div key={i} className={`${k.bg} border ${k.border} rounded-xl p-4 flex items-center gap-3`}>
-            <div className={`w-9 h-9 rounded-lg bg-white flex items-center justify-center ${k.color}`}>
-              {k.icon}
-            </div>
+          { label: 'Pending', value: pending, color: 'text-amber-600', bg: 'bg-amber-50', icon: <Clock size={16} className="text-amber-600" /> },
+          { label: 'Approved', value: approved, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: <CheckCircle2 size={16} className="text-emerald-600" /> },
+          { label: 'Rejected', value: rejected, color: 'text-red-600', bg: 'bg-red-50', icon: <XCircle size={16} className="text-red-600" /> },
+        ].map((k) => (
+          <div key={k.label} className={`${k.bg} border border-border rounded-xl p-4 flex items-center gap-3`}>
+            {k.icon}
             <div>
               <p className={`text-2xl font-bold ${k.color}`}>{k.value}</p>
               <p className="text-xs text-muted-foreground">{k.label}</p>
@@ -120,158 +149,108 @@ export default function LeaveManagementContent() {
           onChange={(e) => setCollege(e.target.value)}
           className="px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
-          {COLLEGES.map((c) => (
-            <option key={c} value={c}>{c === 'All' ? 'All Colleges' : `${COLLEGE_SHORT[c]} — ${c}`}</option>
-          ))}
+          {COLLEGES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <div className="flex gap-1">
-          {['All', 'Pending', 'Approved', 'Rejected'].map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
-                statusFilter === s
-                  ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+        >
+          {['All', 'Pending', 'Approved', 'Rejected'].map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
       </div>
 
       {/* Applications List */}
-      <div className="space-y-3">
-        {filtered.length === 0 ? (
-          <div className="bg-card border border-border rounded-xl py-12 text-center text-muted-foreground text-sm">
-            No leave applications found.
-          </div>
-        ) : (
-          filtered.map((app) => {
+      {loading ? (
+        <div className="card p-8 text-center text-muted-foreground">Loading leave applications from database...</div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((app) => {
             const isExpanded = expandedId === app.id;
+            const isDeleting = deleteConfirmId === app.id;
             return (
-              <div
-                key={app.id}
-                className="bg-card border border-border rounded-xl overflow-hidden"
-              >
-                {/* Card Header */}
-                <div className="flex items-center gap-4 px-5 py-4">
-                  {/* Clickable area */}
-                  <div
-                    className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => setExpandedId(isExpanded ? null : app.id)}
-                  >
-                    {/* Avatar */}
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
-                      {app.staffName.charAt(0)}
+              <div key={app.id} className="card overflow-hidden">
+                <div
+                  className="p-4 flex items-start gap-4 cursor-pointer hover:bg-secondary/20 transition-colors"
+                  onClick={() => setExpandedId(isExpanded ? null : app.id)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-foreground">{app.staffName}</p>
+                      <span className="text-xs text-muted-foreground">{app.empId}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COLLEGE_COLORS[app.college] || 'bg-gray-100 text-gray-700'}`}>
+                        {COLLEGE_SHORT[app.college] || app.college}
+                      </span>
                     </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-foreground text-sm">{app.staffName}</p>
-                        <span className="text-xs text-muted-foreground">{app.empId}</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${LEAVE_TYPE_COLORS[app.leaveType]}`}>
-                          {app.leaveType}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <Building2 size={11} />
-                          {COLLEGE_SHORT[app.college]} · {app.department}
-                        </span>
-                        <span>{app.fromDate} → {app.toDate}</span>
-                        <span className="font-medium">{app.days} day{app.days !== 1 ? 's' : ''}</span>
-                      </div>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${LEAVE_TYPE_COLORS[app.leaveType] || 'bg-gray-100 text-gray-600'}`}>
+                        {app.leaveType}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{app.fromDate} → {app.toDate} ({app.days} day{app.days > 1 ? 's' : ''})</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[app.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {app.status}
+                      </span>
                     </div>
                   </div>
-
-                  {/* Status + Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[app.status]}`}>
-                      {app.status}
-                    </span>
-                    <button
-                      onClick={() => setDeleteConfirmId(app.id)}
-                      className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete application"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                    <button
-                      onClick={() => setExpandedId(isExpanded ? null : app.id)}
-                      className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {isExpanded ? (
-                        <ChevronUp size={16} />
-                      ) : (
-                        <ChevronDown size={16} />
-                      )}
-                    </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isDeleting ? (
+                      <>
+                        <span className="text-xs text-red-600">Delete?</span>
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(app.id); }} className="text-xs text-red-600 hover:underline">Yes</button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(null); }} className="text-xs text-muted-foreground hover:underline">No</button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(app.id); }}
+                        className="p-1.5 text-red-400 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                    {isExpanded ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
                   </div>
                 </div>
 
-                {/* Expanded Details */}
                 {isExpanded && (
-                  <div className="border-t border-border px-5 py-4 space-y-4 bg-muted/20">
-                    {/* Reason */}
+                  <div className="border-t border-border p-4 bg-secondary/10 space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                      <div><p className="text-xs text-muted-foreground">Department</p><p className="font-medium">{app.department}</p></div>
+                      <div><p className="text-xs text-muted-foreground">Role</p><p className="font-medium">{app.role}</p></div>
+                      <div><p className="text-xs text-muted-foreground">Applied On</p><p className="font-medium">{app.appliedOn}</p></div>
+                    </div>
                     <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                        Reason
-                      </p>
-                      <p className="text-sm text-foreground">{app.reason}</p>
+                      <p className="text-xs text-muted-foreground mb-1">Reason</p>
+                      <p className="text-sm text-foreground bg-background border border-border rounded-lg p-3">{app.reason}</p>
                     </div>
-
-                    {/* Applied On */}
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>Applied on: <span className="font-medium text-foreground">{app.appliedOn}</span></span>
-                      {app.approvedOn && (
-                        <span>
-                          {app.status === 'Approved' ? 'Approved' : 'Rejected'} on:{' '}
-                          <span className="font-medium text-foreground">{app.approvedOn}</span>
-                          {app.approvedBy && ` by ${app.approvedBy}`}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Existing Remarks */}
-                    {app.remarks && (
-                      <div className="bg-card border border-border rounded-lg px-4 py-3">
-                        <p className="text-xs font-semibold text-muted-foreground mb-1">Admin Remarks</p>
-                        <p className="text-sm text-foreground">{app.remarks}</p>
+                    {app.status !== 'Pending' && (
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div><p className="text-xs text-muted-foreground">Actioned By</p><p className="font-medium">{app.approvedBy}</p></div>
+                        <div><p className="text-xs text-muted-foreground">On</p><p className="font-medium">{app.approvedOn}</p></div>
+                        {app.remarks && <div className="col-span-2"><p className="text-xs text-muted-foreground">Remarks</p><p className="font-medium">{app.remarks}</p></div>}
                       </div>
                     )}
-
-                    {/* Approval Actions (only for Pending) */}
                     {app.status === 'Pending' && (
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                            Remarks (optional)
-                          </label>
-                          <textarea
-                            rows={2}
-                            placeholder="Add remarks before approving or rejecting…"
-                            value={remarksMap[app.id] || ''}
-                            onChange={(e) =>
-                              setRemarksMap((prev) => ({ ...prev, [app.id]: e.target.value }))
-                            }
-                            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                          />
-                        </div>
-                        <div className="flex gap-3">
+                      <div className="space-y-2">
+                        <textarea
+                          rows={2}
+                          placeholder="Add remarks (optional)…"
+                          value={remarksMap[app.id] || ''}
+                          onChange={(e) => setRemarksMap((m) => ({ ...m, [app.id]: e.target.value }))}
+                          className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                        />
+                        <div className="flex gap-2">
                           <button
                             onClick={() => handleAction(app.id, 'Approved')}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+                            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
                           >
-                            <CheckCircle2 size={15} />
+                            <CheckCircle2 size={14} />
                             Approve
                           </button>
                           <button
                             onClick={() => handleAction(app.id, 'Rejected')}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+                            className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
                           >
-                            <XCircle size={15} />
+                            <XCircle size={14} />
                             Reject
                           </button>
                         </div>
@@ -281,33 +260,10 @@ export default function LeaveManagementContent() {
                 )}
               </div>
             );
-          })
-        )}
-      </div>
-
-      {/* Delete Confirm Modal */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-sm shadow-xl">
-            <h3 className="text-base font-bold text-foreground mb-2">Delete Leave Application?</h3>
-            <p className="text-sm text-muted-foreground mb-5">
-              This will permanently remove this leave application. This action cannot be undone.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirmId)}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
+          })}
+          {filtered.length === 0 && (
+            <div className="card p-8 text-center text-muted-foreground">No leave applications found</div>
+          )}
         </div>
       )}
     </div>

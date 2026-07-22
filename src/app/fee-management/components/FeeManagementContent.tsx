@@ -8,11 +8,12 @@ import FeeTable from './FeeTable';
 import RecordPaymentModal from './RecordPaymentModal';
 import FeeReceiptModal from './FeeReceiptModal';
 import EditFeeModal from './EditFeeModal';
-import { getFeeRecords, saveFeeRecords } from '@/lib/studentStore';
+import { feeService } from '@/lib/supabase/services';
 import { toast } from 'sonner';
 
 export default function FeeManagementContent() {
   const [records, setRecords] = useState<FeeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -25,18 +26,28 @@ export default function FeeManagementContent() {
   const [studentRoll, setStudentRoll] = useState<string | null>(null);
   const perPage = 10;
 
-  // Load from shared store on mount
   useEffect(() => {
     const role = typeof window !== 'undefined' ? localStorage.getItem('gramodyog_role') : null;
     const roll = typeof window !== 'undefined' ? localStorage.getItem('gramodyog_student_roll') : null;
     setStudentRole(role);
     setStudentRoll(roll);
-    setRecords(getFeeRecords());
+    loadRecords();
   }, []);
+
+  async function loadRecords() {
+    setLoading(true);
+    try {
+      const data = await feeService.getAll();
+      setRecords(data as FeeRecord[]);
+    } catch (e: any) {
+      toast.error('Failed to load fee records: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     let base = records;
-    // If student role, only show their own records
     if (studentRole === 'student' && studentRoll) {
       base = base.filter((r) => r.rollNo.toLowerCase() === studentRoll.toLowerCase());
     }
@@ -57,20 +68,30 @@ export default function FeeManagementContent() {
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
-  const handleRecordPayment = (newRecord: FeeRecord) => {
-    const updated = [newRecord, ...records];
-    setRecords(updated);
-    saveFeeRecords(updated);
+  const handleRecordPayment = async (newRecord: FeeRecord) => {
+    try {
+      const result = await feeService.create(newRecord);
+      if (result) {
+        setRecords((prev) => [result as FeeRecord, ...prev]);
+        toast.success(`Payment recorded. Receipt ${newRecord.receiptNo} generated.`);
+      }
+    } catch (e: any) {
+      toast.error('Failed to record payment: ' + e.message);
+    }
     setPaymentOpen(false);
-    toast.success(`Payment recorded. Receipt ${newRecord.receiptNo} generated.`);
   };
 
-  const handleSaveEdit = (updated: FeeRecord) => {
-    const newRecords = records.map((r) => (r.id === updated.id ? updated : r));
-    setRecords(newRecords);
-    saveFeeRecords(newRecords);
+  const handleSaveEdit = async (updated: FeeRecord) => {
+    try {
+      const result = await feeService.update(updated.id, updated);
+      if (result) {
+        setRecords((prev) => prev.map((r) => (r.id === updated.id ? (result as FeeRecord) : r)));
+        toast.success('Fee record updated successfully');
+      }
+    } catch (e: any) {
+      toast.error('Update failed: ' + e.message);
+    }
     setEditRecord(null);
-    toast.success('Fee record updated successfully');
   };
 
   return (
@@ -80,7 +101,7 @@ export default function FeeManagementContent() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Fee Management</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Academic Year 2025–26 · {records.length} records
+            Academic Year 2025–26 · {loading ? 'Loading...' : `${records.length} records`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -98,53 +119,51 @@ export default function FeeManagementContent() {
         </div>
       </div>
 
-      {/* KPI Cards */}
       <FeeKPICards records={records} />
 
-      {/* Filters */}
       <FeeFilters
         search={search}
-        onSearch={(v) => { setSearch(v); setPage(1); }}
+        setSearch={setSearch}
         filterSchool={filterSchool}
-        onFilterSchool={(v) => { setFilterSchool(v); setPage(1); }}
+        setFilterSchool={setFilterSchool}
         filterStatus={filterStatus}
-        onFilterStatus={(v) => { setFilterStatus(v); setPage(1); }}
+        setFilterStatus={setFilterStatus}
         filterMode={filterMode}
-        onFilterMode={(v) => { setFilterMode(v); setPage(1); }}
+        setFilterMode={setFilterMode}
       />
 
-      {/* Table */}
-      <FeeTable
-        records={paginated}
-        onViewReceipt={setReceiptRecord}
-        onEditRecord={setEditRecord}
-        page={page}
-        perPage={perPage}
-        total={filtered.length}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
+      {loading ? (
+        <div className="card p-8 text-center text-muted-foreground">Loading fee records from database...</div>
+      ) : (
+        <FeeTable
+          records={paginated}
+          page={page}
+          perPage={perPage}
+          totalPages={totalPages}
+          totalCount={filtered.length}
+          onPageChange={setPage}
+          onViewReceipt={setReceiptRecord}
+          onEdit={setEditRecord}
+        />
+      )}
 
-      {/* Modals */}
-      <RecordPaymentModal
-        open={paymentOpen}
-        onClose={() => setPaymentOpen(false)}
-        onRecord={handleRecordPayment}
-        existingCount={records.length}
-        allFeeRecords={records}
-      />
+      {paymentOpen && (
+        <RecordPaymentModal
+          onClose={() => setPaymentOpen(false)}
+          onRecord={handleRecordPayment}
+          existingRecords={records}
+        />
+      )}
       {receiptRecord && (
         <FeeReceiptModal
-          open={!!receiptRecord}
-          onClose={() => setReceiptRecord(null)}
           record={receiptRecord}
+          onClose={() => setReceiptRecord(null)}
         />
       )}
       {editRecord && (
         <EditFeeModal
-          open={!!editRecord}
-          onClose={() => setEditRecord(null)}
           record={editRecord}
+          onClose={() => setEditRecord(null)}
           onSave={handleSaveEdit}
         />
       )}
