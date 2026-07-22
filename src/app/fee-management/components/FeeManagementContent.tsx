@@ -21,15 +21,26 @@ export default function FeeManagementContent() {
   const [receiptRecord, setReceiptRecord] = useState<FeeRecord | null>(null);
   const [editRecord, setEditRecord] = useState<FeeRecord | null>(null);
   const [page, setPage] = useState(1);
+  const [studentRole, setStudentRole] = useState<string | null>(null);
+  const [studentRoll, setStudentRoll] = useState<string | null>(null);
   const perPage = 10;
 
   // Load from shared store on mount
   useEffect(() => {
+    const role = typeof window !== 'undefined' ? localStorage.getItem('gramodyog_role') : null;
+    const roll = typeof window !== 'undefined' ? localStorage.getItem('gramodyog_student_roll') : null;
+    setStudentRole(role);
+    setStudentRoll(roll);
     setRecords(getFeeRecords());
   }, []);
 
   const filtered = useMemo(() => {
-    return records.filter((r) => {
+    let base = records;
+    // If student role, only show their own records
+    if (studentRole === 'student' && studentRoll) {
+      base = base.filter((r) => r.rollNo.toLowerCase() === studentRoll.toLowerCase());
+    }
+    return base.filter((r) => {
       const q = search.toLowerCase();
       const matchSearch =
         !q ||
@@ -41,7 +52,7 @@ export default function FeeManagementContent() {
       const matchMode = !filterMode || r.paymentMode === filterMode;
       return matchSearch && matchSchool && matchStatus && matchMode;
     });
-  }, [records, search, filterSchool, filterStatus, filterMode]);
+  }, [records, search, filterSchool, filterStatus, filterMode, studentRole, studentRoll]);
 
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);

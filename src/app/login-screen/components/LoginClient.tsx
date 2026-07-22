@@ -1,11 +1,12 @@
 'use client';
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Eye, EyeOff, Copy, CheckCircle, GraduationCap, Building2, Users, Shield, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap, Building2, Users, Shield, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import AppLogo from '@/components/ui/AppLogo';
-import Icon from '@/components/ui/AppIcon';
+
+import { getStudents } from '@/lib/studentStore';
 
 
 type Role = 'admin' | 'staff' | 'student';
@@ -16,25 +17,18 @@ interface LoginForm {
   remember: boolean;
 }
 
-const mockCredentials: Record<Role, { label: string; identifier: string; password: string; identifierLabel: string }> = {
-  admin: {
-    label: 'Admin',
-    identifier: 'admin@gramodyog.in',
-    password: 'GSS@Admin#2026',
-    identifierLabel: 'Email Address',
-  },
-  staff: {
-    label: 'Staff',
-    identifier: 'staff.rajiv@gramodyog.in',
-    password: 'Staff@RGP#26',
-    identifierLabel: 'Email Address',
-  },
-  student: {
-    label: 'Student',
-    identifier: 'RGP-2026-041',
-    password: 'Student@2026',
-    identifierLabel: 'Roll Number / Email',
-  },
+const adminCredentials = {
+  label: 'Admin',
+  identifier: 'admin@gramodyog.in',
+  password: 'GSS@Admin#2026',
+  identifierLabel: 'Email Address',
+};
+
+const staffCredentials = {
+  label: 'Staff',
+  identifier: 'staff.rajiv@gramodyog.in',
+  password: 'Staff@RGP#26',
+  identifierLabel: 'Email Address',
 };
 
 const schools = [
@@ -76,16 +70,22 @@ const roleCards = [
   },
 ];
 
+// Generate a unique password for each student based on their roll number and DOB
+function getStudentPassword(rollNo: string, dob: string): string {
+  // Password format: first part of rollNo + @ + DOB digits (DDMMYYYY)
+  const dobDigits = dob.replace(/\//g, '');
+  const rollPart = rollNo.replace(/-/g, '').slice(0, 6).toUpperCase();
+  return `${rollPart}@${dobDigits}`;
+}
+
 export default function LoginClient() {
   const [role, setRole] = useState<Role | null>(null);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    setValue,
     reset,
     formState: { errors },
   } = useForm<LoginForm>({ defaultValues: { remember: false } });
@@ -93,44 +93,70 @@ export default function LoginClient() {
   const onSubmit = (data: LoginForm) => {
     if (!role) return;
     setLoading(true);
-    const creds = mockCredentials[role];
+
     setTimeout(() => {
       setLoading(false);
-      if (
-        data.identifier === creds.identifier &&
-        data.password === creds.password
-      ) {
-        toast.success(`Welcome back! Logged in as ${creds.label}`);
-        // Save role for access control
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('gramodyog_role', role);
-        }
-        // Redirect based on role
-        if (role === 'staff') {
-          window.location.href = '/staff-attendance';
-        } else if (role === 'student') {
-          window.location.href = '/fee-management';
-        } else {
+
+      if (role === 'admin') {
+        if (
+          data.identifier === adminCredentials.identifier &&
+          data.password === adminCredentials.password
+        ) {
+          toast.success('Welcome back! Logged in as Admin');
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('gramodyog_role', 'admin');
+            localStorage.removeItem('gramodyog_student_id');
+          }
           window.location.href = '/';
+        } else {
+          toast.error('Invalid credentials. Please check your email and password.');
         }
-      } else {
-        toast.error('Invalid credentials — use the demo accounts below to sign in');
+        return;
+      }
+
+      if (role === 'staff') {
+        if (
+          data.identifier === staffCredentials.identifier &&
+          data.password === staffCredentials.password
+        ) {
+          toast.success('Welcome back! Logged in as Staff');
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('gramodyog_role', 'staff');
+            localStorage.removeItem('gramodyog_student_id');
+          }
+          window.location.href = '/staff-attendance';
+        } else {
+          toast.error('Invalid credentials. Please check your email and password.');
+        }
+        return;
+      }
+
+      if (role === 'student') {
+        const students = getStudents();
+        const matchedStudent = students.find(
+          (s) => s.rollNo.toLowerCase() === data.identifier.toLowerCase()
+        );
+
+        if (!matchedStudent) {
+          toast.error('Roll number not found. Please check and try again.');
+          return;
+        }
+
+        const expectedPassword = getStudentPassword(matchedStudent.rollNo, matchedStudent.dob);
+        if (data.password !== expectedPassword) {
+          toast.error('Invalid password. Please check and try again.');
+          return;
+        }
+
+        toast.success(`Welcome, ${matchedStudent.name}!`);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('gramodyog_role', 'student');
+          localStorage.setItem('gramodyog_student_id', matchedStudent.id);
+          localStorage.setItem('gramodyog_student_roll', matchedStudent.rollNo);
+        }
+        window.location.href = '/fee-management';
       }
     }, 1200);
-  };
-
-  const handleUseCreds = () => {
-    if (!role) return;
-    const c = mockCredentials[role];
-    setValue('identifier', c.identifier);
-    setValue('password', c.password);
-    toast.info(`${c.label} credentials filled`);
-  };
-
-  const handleCopy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
   };
 
   const handleSelectRole = (r: Role) => {
@@ -143,7 +169,11 @@ export default function LoginClient() {
     reset();
   };
 
-  const creds = role ? mockCredentials[role] : null;
+  const identifierLabel =
+    role === 'student' ? 'Roll Number' : role === 'staff' ? 'Email Address' : 'Email Address';
+
+  const roleLabel =
+    role === 'admin' ? 'Admin' : role === 'staff' ? 'Staff' : 'Student';
 
   return (
     <div className="min-h-screen flex">
@@ -177,14 +207,14 @@ export default function LoginClient() {
             Affiliated Institutions
           </p>
           {schools.map((s) => {
-            const Icon = s.icon;
+            const SchoolIcon = s.icon;
             return (
               <div
                 key={s.id}
                 className="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-3 backdrop-blur-sm"
               >
                 <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
-                  <Icon size={16} className="text-white" />
+                  <SchoolIcon size={16} className="text-white" />
                 </div>
                 <div>
                   <p className="text-white text-sm font-semibold">{s.name}</p>
@@ -220,7 +250,7 @@ export default function LoginClient() {
 
               <div className="space-y-3">
                 {roleCards.map((rc) => {
-                  const Icon = rc.icon;
+                  const RoleIcon = rc.icon;
                   return (
                     <button
                       key={`role-card-${rc.role}`}
@@ -228,7 +258,7 @@ export default function LoginClient() {
                       className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 bg-card transition-all duration-150 text-left ${rc.border}`}
                     >
                       <div className={`w-12 h-12 rounded-xl ${rc.bg} flex items-center justify-center flex-shrink-0`}>
-                        <Icon size={22} className={rc.color} />
+                        <RoleIcon size={22} className={rc.color} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-foreground text-sm">{rc.emoji} {rc.label}</p>
@@ -245,7 +275,7 @@ export default function LoginClient() {
           )}
 
           {/* STEP 2: Login form */}
-          {role && creds && (
+          {role && (
             <div>
               <div className="mb-6">
                 <button
@@ -258,15 +288,15 @@ export default function LoginClient() {
                 <div className="flex items-center gap-3 mb-2">
                   {(() => {
                     const rc = roleCards.find((r) => r.role === role)!;
-                    const Icon = rc.icon;
+                    const RoleIcon = rc.icon;
                     return (
                       <div className={`w-10 h-10 rounded-xl ${rc.bg} flex items-center justify-center`}>
-                        <Icon size={18} className={rc.color} />
+                        <RoleIcon size={18} className={rc.color} />
                       </div>
                     );
                   })()}
                   <div>
-                    <h1 className="text-xl font-bold text-foreground">{creds.label} Sign In</h1>
+                    <h1 className="text-xl font-bold text-foreground">{roleLabel} Sign In</h1>
                     <p className="text-xs text-muted-foreground">Enter your credentials to continue</p>
                   </div>
                 </div>
@@ -275,16 +305,16 @@ export default function LoginClient() {
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-foreground mb-1.5">
-                    {creds.identifierLabel}
+                    {identifierLabel}
                   </label>
                   <input
                     type={role === 'student' ? 'text' : 'email'}
                     placeholder={
-                      role === 'student' ? 'Enter Roll No or Email' : 'Enter your email address'
+                      role === 'student' ? 'Enter your Roll Number (e.g. RGP-2026-001)' : 'Enter your email address'
                     }
                     className={`input-field ${errors.identifier ? 'border-danger focus:ring-danger/30' : ''}`}
                     {...register('identifier', {
-                      required: `${creds.identifierLabel} is required`,
+                      required: `${identifierLabel} is required`,
                     })}
                   />
                   {errors.identifier && (
@@ -296,6 +326,11 @@ export default function LoginClient() {
                   <label className="block text-sm font-semibold text-foreground mb-1.5">
                     Password
                   </label>
+                  {role === 'student' && (
+                    <p className="text-xs text-muted-foreground mb-1.5">
+                      Your password is your Roll No (without dashes) + @ + Date of Birth (DDMMYYYY). Contact admin if you need help.
+                    </p>
+                  )}
                   <div className="relative">
                     <input
                       type={showPass ? 'text' : 'password'}
@@ -351,54 +386,10 @@ export default function LoginClient() {
                       Verifying...
                     </>
                   ) : (
-                    `Sign In as ${creds.label}`
+                    `Sign In as ${roleLabel}`
                   )}
                 </button>
               </form>
-
-              {/* Demo credentials */}
-              <div className="mt-6 rounded-xl border border-border bg-secondary/50 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                    Demo Credentials
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleUseCreds}
-                    className="text-xs font-semibold text-primary hover:underline px-2 py-1 rounded hover:bg-primary/5 transition-colors"
-                  >
-                    Use Demo
-                  </button>
-                </div>
-                <div className="bg-card rounded-lg px-3 py-2 border border-border space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{creds.identifierLabel}</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-mono text-foreground truncate max-w-[160px]">{creds.identifier}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(creds.identifier, 'id')}
-                        className="p-1 rounded hover:bg-secondary transition-colors"
-                      >
-                        {copiedField === 'id' ? <CheckCircle size={12} className="text-success" /> : <Copy size={12} className="text-muted-foreground" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Password</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-mono text-foreground">{creds.password}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(creds.password, 'pw')}
-                        className="p-1 rounded hover:bg-secondary transition-colors"
-                      >
-                        {copiedField === 'pw' ? <CheckCircle size={12} className="text-success" /> : <Copy size={12} className="text-muted-foreground" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </div>

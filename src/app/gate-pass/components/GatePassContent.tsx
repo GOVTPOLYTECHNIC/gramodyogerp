@@ -9,12 +9,22 @@ export default function GatePassContent() {
   const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [studentRole, setStudentRole] = useState<string | null>(null);
+  const [studentRoll, setStudentRoll] = useState<string | null>(null);
 
   useEffect(() => {
+    const role = typeof window !== 'undefined' ? localStorage.getItem('gramodyog_role') : null;
+    const roll = typeof window !== 'undefined' ? localStorage.getItem('gramodyog_student_roll') : null;
+    setStudentRole(role);
+    setStudentRoll(roll);
     setStudents(getStudents());
   }, []);
 
   const filtered = students.filter((s) => {
+    // If student role, only show their own record
+    if (studentRole === 'student' && studentRoll) {
+      return s.rollNo.toLowerCase() === studentRoll.toLowerCase();
+    }
     const q = search.toLowerCase();
     return (
       !q ||
