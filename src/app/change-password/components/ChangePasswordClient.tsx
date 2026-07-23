@@ -5,7 +5,7 @@ import { Eye, EyeOff, CheckCircle, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/AppLayout';
 import { createClient } from '@/lib/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+
 
 interface PasswordForm {
   currentPassword: string;
@@ -29,7 +29,6 @@ export default function ChangePasswordClient() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const { user } = useAuth();
   const supabase = createClient();
 
   const validate = (): boolean => {
@@ -71,15 +70,18 @@ export default function ChangePasswordClient() {
     setLoading(true);
 
     try {
-      // Step 1: Verify current password by re-authenticating
-      if (!user?.email) {
+      // Step 1: Get current user directly from Supabase (not from context which may be stale)
+      const { data: { user: currentUser }, error: getUserError } = await supabase.auth.getUser();
+
+      if (getUserError || !currentUser?.email) {
         toast.error('User session not found. Please log in again.');
         setLoading(false);
         return;
       }
 
+      // Step 2: Verify current password by re-authenticating
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
+        email: currentUser.email,
         password: form.currentPassword,
       });
 
@@ -89,7 +91,7 @@ export default function ChangePasswordClient() {
         return;
       }
 
-      // Step 2: Update to new password
+      // Step 3: Update to new password
       const { error: updateError } = await supabase.auth.updateUser({
         password: form.newPassword,
       });
@@ -100,7 +102,7 @@ export default function ChangePasswordClient() {
         return;
       }
 
-      // Step 3: Refresh session so app keeps working
+      // Step 4: Refresh session so app keeps working
       await supabase.auth.refreshSession();
 
       setLoading(false);
