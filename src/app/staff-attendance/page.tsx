@@ -1,26 +1,16 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
-import { CalendarCheck, CheckCircle2, XCircle, Clock, Users, Pencil, Trash2, X, Save, Plus } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { CalendarCheck, CheckCircle2, XCircle, Clock, Users, Pencil, Trash2, X, Save, Plus, Loader2 } from 'lucide-react';
 
 interface StaffMember {
-  id: number;
+  id: string;
   name: string;
   role: string;
   department: string;
   status: string;
 }
-
-const initialStaffList: StaffMember[] = [
-  { id: 1, name: 'Rajesh Kumar', role: 'Principal', department: 'Administration', status: 'present' },
-  { id: 2, name: 'Sunita Devi', role: 'Lecturer', department: 'Computer Science', status: 'present' },
-  { id: 3, name: 'Mohan Lal', role: 'Instructor', department: 'Electrical', status: 'absent' },
-  { id: 4, name: 'Priya Sharma', role: 'Lecturer', department: 'Mechanical', status: 'present' },
-  { id: 5, name: 'Anil Verma', role: 'Lab Assistant', department: 'Electronics', status: 'late' },
-  { id: 6, name: 'Kavita Singh', role: 'Clerk', department: 'Administration', status: 'present' },
-  { id: 7, name: 'Ramesh Yadav', role: 'Instructor', department: 'Civil', status: 'absent' },
-  { id: 8, name: 'Neha Gupta', role: 'Lecturer', department: 'Mathematics', status: 'present' },
-];
 
 type AttendanceStatus = 'present' | 'absent' | 'late';
 
@@ -32,15 +22,48 @@ interface EditForm {
 
 export default function StaffAttendancePage() {
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  const [staffList, setStaffList] = useState<StaffMember[]>(initialStaffList);
-  const [attendance, setAttendance] = useState<Record<number, AttendanceStatus>>(
-    Object.fromEntries(initialStaffList.map((s) => [s.id, s.status as AttendanceStatus]))
-  );
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({ name: '', role: '', department: '' });
-  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState<EditForm>({ name: '', role: '', department: '' });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchStaff = async () => {
+      setLoading(true);
+      setError(null);
+      const supabase = createClient();
+      const { data, error: fetchError } = await supabase
+        .from('staff')
+        .select('id, name, role, department')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (fetchError) {
+        setError(fetchError.message);
+        setLoading(false);
+        return;
+      }
+
+      const members: StaffMember[] = (data || []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        role: s.role || 'Staff',
+        department: s.department || 'General',
+        status: 'present',
+      }));
+
+      setStaffList(members);
+      setAttendance(Object.fromEntries(members.map((s) => [s.id, 'present' as AttendanceStatus])));
+      setLoading(false);
+    };
+
+    fetchStaff();
+  }, []);
 
   const counts = {
     present: Object.values(attendance).filter((v) => v === 'present').length,
@@ -59,7 +82,7 @@ export default function StaffAttendancePage() {
     setEditForm({ name: staff.name, role: staff.role, department: staff.department });
   };
 
-  const handleEditSave = (id: number) => {
+  const handleEditSave = (id: string) => {
     if (!editForm.name.trim()) return;
     setStaffList((prev) =>
       prev.map((s) => s.id === id ? { ...s, name: editForm.name.trim(), role: editForm.role.trim(), department: editForm.department.trim() } : s)
@@ -71,7 +94,7 @@ export default function StaffAttendancePage() {
     setEditingId(null);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: string) => {
     setStaffList((prev) => prev.filter((s) => s.id !== id));
     setAttendance((prev) => {
       const updated = { ...prev };
@@ -83,7 +106,7 @@ export default function StaffAttendancePage() {
 
   const handleAddStaff = () => {
     if (!addForm.name.trim()) return;
-    const newId = Date.now();
+    const newId = `local-${Date.now()}`;
     const newStaff: StaffMember = {
       id: newId,
       name: addForm.name.trim(),
@@ -160,150 +183,167 @@ export default function StaffAttendancePage() {
             <CalendarCheck size={18} className="text-primary" />
             <h2 className="font-semibold text-foreground">Today&apos;s Attendance</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-secondary/50">
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">#</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Name</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Role</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Department</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Status</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Mark</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {staffList.map((staff, idx) => {
-                  const status = attendance[staff.id] || 'present';
-                  const cfg = statusConfig[status];
-                  const isEditing = editingId === staff.id;
-                  const isDeleting = deleteConfirmId === staff.id;
 
-                  return (
-                    <tr key={staff.id} className="hover:bg-secondary/30 transition-colors">
-                      <td className="px-4 py-3 text-muted-foreground">{idx + 1}</td>
+          {loading ? (
+            <div className="flex items-center justify-center py-16 gap-3 text-muted-foreground">
+              <Loader2 size={20} className="animate-spin" />
+              <span>Loading staff...</span>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center py-16 text-danger text-sm">
+              Error: {error}
+            </div>
+          ) : staffList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-sm gap-2">
+              <Users size={32} className="opacity-30" />
+              <p>Koi staff nahi mila. Pehle Staff Management mein staff add karein.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-secondary/50">
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">#</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Name</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Role</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Department</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Status</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Mark</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {staffList.map((staff, idx) => {
+                    const status = attendance[staff.id] || 'present';
+                    const cfg = statusConfig[status];
+                    const isEditing = editingId === staff.id;
+                    const isDeleting = deleteConfirmId === staff.id;
 
-                      {/* Name */}
-                      <td className="px-4 py-3 font-medium text-foreground">
-                        {isEditing ? (
-                          <input
-                            className="input-field py-1 text-sm w-36"
-                            value={editForm.name}
-                            onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                          />
-                        ) : staff.name}
-                      </td>
+                    return (
+                      <tr key={staff.id} className="hover:bg-secondary/30 transition-colors">
+                        <td className="px-4 py-3 text-muted-foreground">{idx + 1}</td>
 
-                      {/* Role */}
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {isEditing ? (
-                          <input
-                            className="input-field py-1 text-sm w-28"
-                            value={editForm.role}
-                            onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
-                          />
-                        ) : staff.role}
-                      </td>
+                        {/* Name */}
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {isEditing ? (
+                            <input
+                              className="input-field py-1 text-sm w-36"
+                              value={editForm.name}
+                              onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                            />
+                          ) : staff.name}
+                        </td>
 
-                      {/* Department */}
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {isEditing ? (
-                          <input
-                            className="input-field py-1 text-sm w-32"
-                            value={editForm.department}
-                            onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
-                          />
-                        ) : staff.department}
-                      </td>
+                        {/* Role */}
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {isEditing ? (
+                            <input
+                              className="input-field py-1 text-sm w-28"
+                              value={editForm.role}
+                              onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
+                            />
+                          ) : staff.role}
+                        </td>
 
-                      {/* Status Badge */}
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${cfg.color}`}>
-                          {cfg.icon}
-                          {cfg.label}
-                        </span>
-                      </td>
+                        {/* Department */}
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {isEditing ? (
+                            <input
+                              className="input-field py-1 text-sm w-32"
+                              value={editForm.department}
+                              onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
+                            />
+                          ) : staff.department}
+                        </td>
 
-                      {/* Mark Attendance */}
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1">
-                          {(['present', 'absent', 'late'] as AttendanceStatus[]).map((s) => (
-                            <button
-                              key={s}
-                              onClick={() => setAttendance((prev) => ({ ...prev, [staff.id]: s }))}
-                              className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
-                                status === s
-                                  ? statusConfig[s].color
-                                  : 'text-muted-foreground border-border hover:bg-secondary'
-                              }`}
-                            >
-                              {statusConfig[s].label}
-                            </button>
-                          ))}
-                        </div>
-                      </td>
+                        {/* Status Badge */}
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${cfg.color}`}>
+                            {cfg.icon}
+                            {cfg.label}
+                          </span>
+                        </td>
 
-                      {/* Edit / Delete Actions */}
-                      <td className="px-4 py-3">
-                        {isDeleting ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-danger font-medium">Delete?</span>
-                            <button
-                              onClick={() => handleDelete(staff.id)}
-                              className="px-2 py-1 rounded text-xs font-medium bg-danger text-white hover:bg-danger/90 transition-colors"
-                            >
-                              Yes
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirmId(null)}
-                              className="px-2 py-1 rounded text-xs font-medium border border-border hover:bg-secondary transition-colors"
-                            >
-                              No
-                            </button>
+                        {/* Mark Attendance */}
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1">
+                            {(['present', 'absent', 'late'] as AttendanceStatus[]).map((s) => (
+                              <button
+                                key={s}
+                                onClick={() => setAttendance((prev) => ({ ...prev, [staff.id]: s }))}
+                                className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
+                                  status === s
+                                    ? statusConfig[s].color
+                                    : 'text-muted-foreground border-border hover:bg-secondary'
+                                }`}
+                              >
+                                {statusConfig[s].label}
+                              </button>
+                            ))}
                           </div>
-                        ) : isEditing ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleEditSave(staff.id)}
-                              className="p-1.5 rounded text-green-600 hover:bg-green-50 transition-colors"
-                              title="Save"
-                            >
-                              <Save size={15} />
-                            </button>
-                            <button
-                              onClick={handleEditCancel}
-                              className="p-1.5 rounded text-muted-foreground hover:bg-secondary transition-colors"
-                              title="Cancel"
-                            >
-                              <X size={15} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleEditStart(staff)}
-                              className="p-1.5 rounded text-primary hover:bg-primary/10 transition-colors"
-                              title="Edit"
-                            >
-                              <Pencil size={15} />
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirmId(staff.id)}
-                              className="p-1.5 rounded text-danger hover:bg-danger/10 transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+
+                        {/* Edit / Delete Actions */}
+                        <td className="px-4 py-3">
+                          {isDeleting ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-danger font-medium">Delete?</span>
+                              <button
+                                onClick={() => handleDelete(staff.id)}
+                                className="px-2 py-1 rounded text-xs font-medium bg-danger text-white hover:bg-danger/90 transition-colors"
+                              >
+                                Yes
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                className="px-2 py-1 rounded text-xs font-medium border border-border hover:bg-secondary transition-colors"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleEditSave(staff.id)}
+                                className="p-1.5 rounded text-green-600 hover:bg-green-50 transition-colors"
+                                title="Save"
+                              >
+                                <Save size={15} />
+                              </button>
+                              <button
+                                onClick={handleEditCancel}
+                                className="p-1.5 rounded text-muted-foreground hover:bg-secondary transition-colors"
+                                title="Cancel"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleEditStart(staff)}
+                                className="p-1.5 rounded text-primary hover:bg-primary/10 transition-colors"
+                                title="Edit"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmId(staff.id)}
+                                className="p-1.5 rounded text-danger hover:bg-danger/10 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Add Staff Modal */}
