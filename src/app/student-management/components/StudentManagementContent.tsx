@@ -155,15 +155,15 @@ export default function StudentManagementContent() {
 
       <StudentFilters
         search={search}
-        setSearch={setSearch}
+        onSearch={setSearch}
         filterSchool={filterSchool}
-        setFilterSchool={setFilterSchool}
+        onFilterSchool={setFilterSchool}
         filterCourse={filterCourse}
-        setFilterCourse={setFilterCourse}
+        onFilterCourse={setFilterCourse}
         filterStatus={filterStatus}
-        setFilterStatus={setFilterStatus}
+        onFilterStatus={setFilterStatus}
         filterSemester={filterSemester}
-        setFilterSemester={setFilterSemester}
+        onFilterSemester={setFilterSemester}
       />
 
       {loading ? (
