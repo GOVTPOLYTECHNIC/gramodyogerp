@@ -140,7 +140,7 @@ export default function RecordPaymentModal({
       paymentMode: data.paymentMode,
       remarks: data.remarks,
       status,
-      academicYear: '2025-26',
+      academicYear: '2026-27',
     };
 
     setTimeout(() => {

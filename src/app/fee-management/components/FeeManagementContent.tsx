@@ -101,7 +101,7 @@ export default function FeeManagementContent() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Fee Management</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Academic Year 2025–26 · {loading ? 'Loading...' : `${records.length} records`}
+            Academic Year 2026–27 · {loading ? 'Loading...' : `${records.length} records`}
           </p>
         </div>
         <div className="flex items-center gap-2">

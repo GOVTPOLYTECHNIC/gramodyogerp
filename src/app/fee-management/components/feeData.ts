@@ -43,7 +43,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Online',
     remarks: 'Full payment',
     status: 'Paid',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3002',
@@ -61,7 +61,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Cash',
     remarks: 'First instalment',
     status: 'Partial',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3003',
@@ -79,7 +79,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Cash',
     remarks: '',
     status: 'Pending',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3004',
@@ -97,7 +97,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'DD',
     remarks: 'Lateral entry, ₹2000 merit discount',
     status: 'Paid',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3005',
@@ -115,7 +115,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Online',
     remarks: 'SC category scholarship discount',
     status: 'Paid',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3006',
@@ -133,7 +133,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Cash',
     remarks: 'Overdue since April 2026',
     status: 'Overdue',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3007',
@@ -151,7 +151,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Cash',
     remarks: 'Partial — balance due',
     status: 'Partial',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3008',
@@ -169,7 +169,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Cheque',
     remarks: 'Full payment by cheque',
     status: 'Paid',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3009',
@@ -187,7 +187,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Online',
     remarks: 'Full fee, ₹5000 govt. scholarship adjusted',
     status: 'Paid',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3010',
@@ -205,7 +205,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Cash',
     remarks: '',
     status: 'Pending',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3011',
@@ -223,7 +223,7 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Cash',
     remarks: 'Overdue — last payment April 2026',
     status: 'Overdue',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
   {
     id: 'fee-3012',
@@ -241,6 +241,6 @@ export const mockFeeRecords: FeeRecord[] = [
     paymentMode: 'Online',
     remarks: 'Full payment online',
     status: 'Paid',
-    academicYear: '2025-26',
+    academicYear: '2026-27',
   },
 ];
