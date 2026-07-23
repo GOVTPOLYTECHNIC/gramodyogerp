@@ -10,7 +10,7 @@ import {
   Building2,
   Clock,
 } from 'lucide-react';
-import { getStudents, getFeeRecords } from '@/lib/studentStore';
+import { studentService, feeService } from '@/lib/supabase/services';
 import Icon from '@/components/ui/AppIcon';
 
 
@@ -32,154 +32,156 @@ export default function KPIBentoGrid() {
   >([]);
 
   useEffect(() => {
-    const students = getStudents();
-    const feeRecords = getFeeRecords();
+    async function loadData() {
+      const [students, feeRecords] = await Promise.all([
+        studentService.getAll(),
+        feeService.getAll(),
+      ]);
 
-    const totalStudents = students.length;
-    const rgpCount = students.filter((s) => s.school === 'Rajiv Gandhi Polytechnic').length;
-    const itiCount = students.filter((s) => s.school === 'Rajiv Gandhi ITI').length;
-    const gssCount = students.filter((s) => s.school === 'GSS Diploma College').length;
+      const totalStudents = students.length;
+      const rgpCount = students.filter((s) => s.school === 'Rajiv Gandhi Polytechnic').length;
+      const itiCount = students.filter((s) => s.school === 'Rajiv Gandhi ITI').length;
+      const gssCount = students.filter((s) => s.school === 'GSS Diploma College').length;
 
-    // Fee collected today (use all paid records as proxy since no real date tracking)
-    const totalCollected = feeRecords.reduce((sum, r) => sum + r.paidAmount, 0);
+      const totalCollected = feeRecords.reduce((sum, r) => sum + r.paidAmount, 0);
 
-    // Pending dues
-    const totalPending = students.reduce(
-      (sum, s) => sum + Math.max(0, s.totalFees - s.paidFees),
-      0
-    );
-    const studentsWithDues = students.filter((s) => s.feeStatus !== 'Paid').length;
-    const overdueStudents = students.filter((s) => s.feeStatus === 'Overdue').length;
+      const totalPending = students.reduce(
+        (sum, s) => sum + Math.max(0, s.totalFees - s.paidFees),
+        0
+      );
+      const studentsWithDues = students.filter((s) => s.feeStatus !== 'Paid').length;
+      const overdueStudents = students.filter((s) => s.feeStatus === 'Overdue').length;
 
-    // New admissions this year
-    const currentYear = new Date().getFullYear().toString();
-    const newAdmissions = students.filter((s) => s.admissionYear === currentYear).length;
+      const currentYear = new Date().getFullYear().toString();
+      const newAdmissions = students.filter((s) => s.admissionYear === currentYear).length;
 
-    // Receipts = fee records with paid amount > 0
-    const receiptsGenerated = feeRecords.filter((r) => r.paidAmount > 0).length;
-    const rgpReceipts = feeRecords.filter(
-      (r) => r.school === 'Rajiv Gandhi Polytechnic' && r.paidAmount > 0
-    ).length;
-    const itiReceipts = feeRecords.filter(
-      (r) => r.school === 'Rajiv Gandhi ITI' && r.paidAmount > 0
-    ).length;
-    const gssReceipts = feeRecords.filter(
-      (r) => r.school === 'GSS Diploma College' && r.paidAmount > 0
-    ).length;
+      const receiptsGenerated = feeRecords.filter((r) => r.paidAmount > 0).length;
+      const rgpReceipts = feeRecords.filter(
+        (r) => r.school === 'Rajiv Gandhi Polytechnic' && r.paidAmount > 0
+      ).length;
+      const itiReceipts = feeRecords.filter(
+        (r) => r.school === 'Rajiv Gandhi ITI' && r.paidAmount > 0
+      ).length;
+      const gssReceipts = feeRecords.filter(
+        (r) => r.school === 'GSS Diploma College' && r.paidAmount > 0
+      ).length;
 
-    const fmt = (n: number) =>
-      n >= 100000
-        ? `₹${(n / 100000).toFixed(2)}L`
-        : n >= 1000
-        ? `₹${(n / 1000).toFixed(1)}K`
-        : `₹${n}`;
+      const fmt = (n: number) =>
+        n >= 100000
+          ? `₹${(n / 100000).toFixed(2)}L`
+          : n >= 1000
+          ? `₹${(n / 1000).toFixed(1)}K`
+          : `₹${n}`;
 
-    setKpiData([
-      {
-        id: 'kpi-total-students',
-        label: 'Total Enrolled Students',
-        value: totalStudents.toString(),
-        sub: `RGP: ${rgpCount} · ITI: ${itiCount} · GSS: ${gssCount}`,
-        icon: Users,
-        color: 'text-blue-700',
-        bg: 'bg-blue-50',
-        border: 'border-blue-200',
-        trend: `${newAdmissions} new this year`,
-        trendUp: true,
-        span: 'lg:col-span-2',
-      },
-      {
-        id: 'kpi-fee-collected',
-        label: 'Total Fee Collected',
-        value: fmt(totalCollected),
-        sub: 'All time collected',
-        icon: IndianRupee,
-        color: 'text-green-700',
-        bg: 'bg-green-50',
-        border: 'border-green-200',
-        trend: `${receiptsGenerated} receipts`,
-        trendUp: true,
-        span: '',
-      },
-      {
-        id: 'kpi-pending-dues',
-        label: 'Pending Fee Dues',
-        value: fmt(totalPending),
-        sub: `${studentsWithDues} students with dues`,
-        icon: AlertCircle,
-        color: 'text-red-700',
-        bg: 'bg-red-50',
-        border: 'border-red-200',
-        trend: `${overdueStudents} overdue`,
-        trendUp: false,
-        span: '',
-      },
-      {
-        id: 'kpi-attendance',
-        label: "Today's Staff Attendance",
-        value: '—',
-        sub: 'Mark attendance to update',
-        icon: CalendarCheck,
-        color: 'text-amber-700',
-        bg: 'bg-amber-50',
-        border: 'border-amber-200',
-        trend: 'Go to Staff Attendance',
-        trendUp: true,
-        span: '',
-      },
-      {
-        id: 'kpi-admissions',
-        label: `New Admissions (${currentYear})`,
-        value: newAdmissions.toString(),
-        sub: 'Current year intake',
-        icon: TrendingUp,
-        color: 'text-purple-700',
-        bg: 'bg-purple-50',
-        border: 'border-purple-200',
-        trend: `${totalStudents} total enrolled`,
-        trendUp: newAdmissions > 0,
-        span: '',
-      },
-      {
-        id: 'kpi-receipts',
-        label: 'Receipts Generated',
-        value: receiptsGenerated.toString(),
-        sub: 'Total fee receipts',
-        icon: GraduationCap,
-        color: 'text-teal-700',
-        bg: 'bg-teal-50',
-        border: 'border-teal-200',
-        trend: `RGP: ${rgpReceipts} · ITI: ${itiReceipts} · GSS: ${gssReceipts}`,
-        trendUp: true,
-        span: '',
-      },
-      {
-        id: 'kpi-schools',
-        label: 'Active Institutions',
-        value: '3',
-        sub: 'RGP · ITI · GSS',
-        icon: Building2,
-        color: 'text-indigo-700',
-        bg: 'bg-indigo-50',
-        border: 'border-indigo-200',
-        trend: 'All operational',
-        trendUp: true,
-        span: '',
-      },
-      {
-        id: 'kpi-overdue',
-        label: 'Overdue Fees Alert',
-        value: overdueStudents.toString(),
-        sub: 'Students with overdue fees',
-        icon: Clock,
-        color: 'text-red-700',
-        bg: 'bg-red-100',
-        border: 'border-red-300',
-        trend: overdueStudents > 0 ? 'Requires immediate action' : 'No overdue fees',
-        trendUp: false,
-        span: '',
-      },
-    ]);
+      setKpiData([
+        {
+          id: 'kpi-total-students',
+          label: 'Total Enrolled Students',
+          value: totalStudents.toString(),
+          sub: `RGP: ${rgpCount} · ITI: ${itiCount} · GSS: ${gssCount}`,
+          icon: Users,
+          color: 'text-blue-700',
+          bg: 'bg-blue-50',
+          border: 'border-blue-200',
+          trend: `${newAdmissions} new this year`,
+          trendUp: true,
+          span: 'lg:col-span-2',
+        },
+        {
+          id: 'kpi-fee-collected',
+          label: 'Total Fee Collected',
+          value: fmt(totalCollected),
+          sub: 'All time collected',
+          icon: IndianRupee,
+          color: 'text-green-700',
+          bg: 'bg-green-50',
+          border: 'border-green-200',
+          trend: `${receiptsGenerated} receipts`,
+          trendUp: true,
+          span: '',
+        },
+        {
+          id: 'kpi-pending-dues',
+          label: 'Pending Fee Dues',
+          value: fmt(totalPending),
+          sub: `${studentsWithDues} students with dues`,
+          icon: AlertCircle,
+          color: 'text-red-700',
+          bg: 'bg-red-50',
+          border: 'border-red-200',
+          trend: `${overdueStudents} overdue`,
+          trendUp: false,
+          span: '',
+        },
+        {
+          id: 'kpi-attendance',
+          label: "Today's Staff Attendance",
+          value: '—',
+          sub: 'Mark attendance to update',
+          icon: CalendarCheck,
+          color: 'text-amber-700',
+          bg: 'bg-amber-50',
+          border: 'border-amber-200',
+          trend: 'Go to Staff Attendance',
+          trendUp: true,
+          span: '',
+        },
+        {
+          id: 'kpi-admissions',
+          label: `New Admissions (${currentYear})`,
+          value: newAdmissions.toString(),
+          sub: 'Current year intake',
+          icon: TrendingUp,
+          color: 'text-purple-700',
+          bg: 'bg-purple-50',
+          border: 'border-purple-200',
+          trend: `${totalStudents} total enrolled`,
+          trendUp: newAdmissions > 0,
+          span: '',
+        },
+        {
+          id: 'kpi-receipts',
+          label: 'Receipts Generated',
+          value: receiptsGenerated.toString(),
+          sub: 'Total fee receipts',
+          icon: GraduationCap,
+          color: 'text-teal-700',
+          bg: 'bg-teal-50',
+          border: 'border-teal-200',
+          trend: `RGP: ${rgpReceipts} · ITI: ${itiReceipts} · GSS: ${gssReceipts}`,
+          trendUp: true,
+          span: '',
+        },
+        {
+          id: 'kpi-schools',
+          label: 'Active Institutions',
+          value: '3',
+          sub: 'RGP · ITI · GSS',
+          icon: Building2,
+          color: 'text-indigo-700',
+          bg: 'bg-indigo-50',
+          border: 'border-indigo-200',
+          trend: 'All operational',
+          trendUp: true,
+          span: '',
+        },
+        {
+          id: 'kpi-overdue',
+          label: 'Overdue Fees Alert',
+          value: overdueStudents.toString(),
+          sub: 'Students with overdue fees',
+          icon: Clock,
+          color: 'text-red-700',
+          bg: 'bg-red-100',
+          border: 'border-red-300',
+          trend: overdueStudents > 0 ? 'Requires immediate action' : 'No overdue fees',
+          trendUp: false,
+          span: '',
+        },
+      ]);
+    }
+
+    loadData();
   }, []);
 
   if (kpiData.length === 0) {
@@ -208,7 +210,7 @@ export default function KPIBentoGrid() {
               <span
                 className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                   kpi?.trendUp
-                    ? 'bg-green-50 text-green-700' :'bg-red-50 text-red-700'
+                    ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
                 }`}
               >
                 {kpi?.trend}

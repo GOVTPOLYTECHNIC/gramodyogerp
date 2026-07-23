@@ -26,7 +26,7 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { getStudents, getFeeRecords } from '@/lib/studentStore';
+import { studentService, feeService } from '@/lib/supabase/services';
 
 const COLLEGES = [
   {
@@ -123,8 +123,15 @@ export default function FinancialReconciliationContent() {
   const [feeRecords, setFeeRecords] = useState<any[]>([]);
 
   useEffect(() => {
-    setStudents(getStudents());
-    setFeeRecords(getFeeRecords());
+    async function loadData() {
+      const [studentsData, feesData] = await Promise.all([
+        studentService.getAll(),
+        feeService.getAll(),
+      ]);
+      setStudents(studentsData);
+      setFeeRecords(feesData);
+    }
+    loadData();
   }, []);
 
   // ── Institution-level aggregations ──────────────────────────────────────
