@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Eye, EyeOff, CheckCircle, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/AppLayout';
+import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PasswordForm {
   currentPassword: string;
@@ -27,6 +29,8 @@ export default function ChangePasswordClient() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const { user } = useAuth();
+  const supabase = createClient();
 
   const validate = (): boolean => {
     const newErrors: FieldErrors = {};
@@ -61,16 +65,51 @@ export default function ChangePasswordClient() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    // Backend integration point: POST /api/auth/change-password with { currentPassword, newPassword }
-    setTimeout(() => {
+
+    try {
+      // Step 1: Verify current password by re-authenticating
+      if (!user?.email) {
+        toast.error('User session not found. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: form.currentPassword,
+      });
+
+      if (signInError) {
+        setErrors({ currentPassword: 'Current password is incorrect' });
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: form.newPassword,
+      });
+
+      if (updateError) {
+        toast.error(updateError.message || 'Failed to update password. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      // Step 3: Refresh session so app keeps working
+      await supabase.auth.refreshSession();
+
       setLoading(false);
       setSuccess(true);
       toast.success('Password changed successfully!');
-    }, 1200);
+    } catch (err: any) {
+      toast.error(err?.message || 'Something went wrong. Please try again.');
+      setLoading(false);
+    }
   };
 
   const passwordStrength = (pwd: string): { label: string; color: string; width: string } => {
