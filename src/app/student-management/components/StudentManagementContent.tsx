@@ -174,7 +174,7 @@ export default function StudentManagementContent() {
           page={page}
           perPage={perPage}
           totalPages={totalPages}
-          totalCount={filtered.length}
+          total={filtered.length}
           onPageChange={setPage}
           onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
           onEdit={setEditStudent}
