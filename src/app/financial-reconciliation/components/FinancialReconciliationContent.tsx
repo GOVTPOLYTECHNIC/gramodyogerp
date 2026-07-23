@@ -265,7 +265,7 @@ export default function FinancialReconciliationContent() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Financial Reconciliation</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Institution-wide fee collection overview — Academic Year 2025-26
+            Institution-wide fee collection overview — Academic Year 2026-27
           </p>
         </div>
         <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-xl px-4 py-2">

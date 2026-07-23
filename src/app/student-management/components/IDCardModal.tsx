@@ -122,7 +122,7 @@ export default function IDCardModal({ open, onClose, student }: IDCardModalProps
       </div>
     </div>
     <div class="card-footer">
-      <p>Valid: 2025–26</p>
+      <p>Valid: 2026–27</p>
       <p>gramodyog.in</p>
     </div>
   </div>
@@ -218,7 +218,7 @@ export default function IDCardModal({ open, onClose, student }: IDCardModalProps
 
           {/* Footer */}
           <div className="bg-accent px-4 py-2 flex items-center justify-between">
-            <p className="text-white text-xs font-semibold">Valid: 2025–26</p>
+            <p className="text-white text-xs font-semibold">Valid: 2026–27</p>
             <p className="text-white text-xs">gramodyog.in</p>
           </div>
         </div>

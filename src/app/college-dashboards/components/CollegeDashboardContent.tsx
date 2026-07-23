@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Users, IndianRupee, AlertCircle, Tag, Building2, CheckCircle2, Clock, XCircle,  } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,  } from 'recharts';
-import { getStudents, getFeeRecords } from '@/lib/studentStore';
+import { studentService, feeService } from '@/lib/supabase/services';
 import { Student } from '@/app/student-management/components/studentData';
 import { FeeRecord } from '@/app/fee-management/components/feeData';
 
@@ -149,10 +149,25 @@ export default function CollegeDashboardContent() {
   const [activeCollege, setActiveCollege] = useState<CollegeKey>('RGP');
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [allFeeRecords, setAllFeeRecords] = useState<FeeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setAllStudents(getStudents());
-    setAllFeeRecords(getFeeRecords());
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const [students, fees] = await Promise.all([
+          studentService.getAll(),
+          feeService.getAll(),
+        ]);
+        setAllStudents(students as Student[]);
+        setAllFeeRecords(fees as FeeRecord[]);
+      } catch (e) {
+        console.error('College dashboard fetch error:', e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, []);
 
   const college = COLLEGES.find((c) => c.key === activeCollege)!;
@@ -279,7 +294,7 @@ export default function CollegeDashboardContent() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">College-wise Dashboards</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Gramodyog Sewa Sansthan — Academic Year 2025–26
+            Gramodyog Sewa Sansthan — Academic Year 2026–27
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-lg px-3 py-2">
