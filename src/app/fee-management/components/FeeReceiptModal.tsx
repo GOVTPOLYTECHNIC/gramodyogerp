@@ -8,6 +8,7 @@ interface FeeReceiptModalProps {
   open: boolean;
   onClose: () => void;
   record: FeeRecord;
+  allRecords: FeeRecord[];
 }
 
 const schoolFullDetails: Record<string, { name: string; address: string; phone: string; affiliation: string }> = {
@@ -31,11 +32,23 @@ const schoolFullDetails: Record<string, { name: string; address: string; phone: 
   },
 };
 
-export default function FeeReceiptModal({ open, onClose, record }: FeeReceiptModalProps) {
+export default function FeeReceiptModal({ open, onClose, record, allRecords }: FeeReceiptModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const schoolDetails = schoolFullDetails[record.school] || schoolFullDetails['Rajiv Gandhi Polytechnic'];
   const netFee = record.annualFee - record.discount;
-  const balance = netFee - record.paidAmount;
+
+  // Cumulative total paid by this student for same course/semester/year
+  const totalPaid = allRecords
+    .filter(
+      (r) =>
+        r.rollNo === record.rollNo &&
+        r.course === record.course &&
+        r.semester === record.semester &&
+        r.academicYear === record.academicYear
+    )
+    .reduce((sum, r) => sum + r.paidAmount, 0);
+
+  const balance = netFee - totalPaid;
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=820,height=700');
@@ -151,8 +164,12 @@ export default function FeeReceiptModal({ open, onClose, record }: FeeReceiptMod
           <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">₹${netFee.toLocaleString('en-IN')}</td>
         </tr>
         <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">Amount Paid (This Transaction)</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">Amount Paid (This Installment)</td>
           <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:#2563eb;">₹${record.paidAmount.toLocaleString('en-IN')}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;font-weight:600;color:#059669;">Total Paid So Far (All Installments)</td>
+          <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;color:#059669;">₹${totalPaid.toLocaleString('en-IN')}</td>
         </tr>
         <tr style="background:${balance > 0 ? '#fef2f2' : '#f0fdf4'};">
           <td style="padding:10px 0;font-weight:700;color:${balance > 0 ? '#dc2626' : '#16a34a'};">
@@ -288,9 +305,15 @@ export default function FeeReceiptModal({ open, onClose, record }: FeeReceiptMod
                   </td>
                 </tr>
                 <tr className="border-b border-border/50">
-                  <td className="py-2 text-foreground">Amount Paid (This Transaction)</td>
+                  <td className="py-2 text-foreground">Amount Paid (This Installment)</td>
                   <td className="py-2 text-right font-tabular font-bold text-primary">
                     ₹{record.paidAmount.toLocaleString('en-IN')}
+                  </td>
+                </tr>
+                <tr className="border-b border-border/50 bg-green-50/50">
+                  <td className="py-2 font-semibold text-success">Total Paid So Far (All Installments)</td>
+                  <td className="py-2 text-right font-tabular font-bold text-success">
+                    ₹{totalPaid.toLocaleString('en-IN')}
                   </td>
                 </tr>
                 <tr className={balance > 0 ? 'bg-red-50' : 'bg-green-50'}>

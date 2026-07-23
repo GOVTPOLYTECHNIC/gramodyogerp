@@ -137,10 +137,11 @@ export default function FeeManagementContent() {
       ) : (
         <FeeTable
           records={paginated}
+          allRecords={records}
           page={page}
           perPage={perPage}
+          total={filtered.length}
           totalPages={totalPages}
-          totalCount={filtered.length}
           onPageChange={setPage}
           onViewReceipt={setReceiptRecord}
           onEdit={setEditRecord}
@@ -159,6 +160,7 @@ export default function FeeManagementContent() {
         <FeeReceiptModal
           open={!!receiptRecord}
           record={receiptRecord}
+          allRecords={records}
           onClose={() => setReceiptRecord(null)}
         />
       )}
