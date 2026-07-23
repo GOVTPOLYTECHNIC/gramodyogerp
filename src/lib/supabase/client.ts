@@ -32,19 +32,19 @@ const fromCookies = () =>
 
 const fromStorage = () => {
   try {
-    return Object.keys(localStorage)
+    return Object.keys(sessionStorage)
       .filter((k) => k.startsWith(PFX))
-      .map((k) => ({ name: k.slice(PFX.length), value: localStorage.getItem(k) || '' }));
+      .map((k) => ({ name: k.slice(PFX.length), value: sessionStorage.getItem(k) || '' }));
   } catch {
     return [];
   }
 };
 
 const setCookie = (name: string, value: string, options?: any) => {
+  // Use session cookie (no Max-Age/Expires) so it clears on browser close
   let s = `${name}=${encodeURIComponent(value)}; Path=${options?.path || '/'}; SameSite=None; Secure; Partitioned`;
-  if (options?.maxAge) s += `; Max-Age=${options.maxAge}`;
+  // Intentionally omit maxAge/expires so cookie is a session cookie
   if (options?.domain) s += `; Domain=${options.domain}`;
-  if (options?.expires) s += `; Expires=${new Date(options.expires).toUTCString()}`;
   document.cookie = s;
 };
 
@@ -105,8 +105,8 @@ export function createClient() {
             cookiesToSet.forEach(({ name, value, options }) => {
               try {
                 value
-                  ? localStorage.setItem(`${PFX}${name}`, value)
-                  : localStorage.removeItem(`${PFX}${name}`);
+                  ? sessionStorage.setItem(`${PFX}${name}`, value)
+                  : sessionStorage.removeItem(`${PFX}${name}`);
               } catch {}
               if (value) setCookie(name, value, options);
             });
