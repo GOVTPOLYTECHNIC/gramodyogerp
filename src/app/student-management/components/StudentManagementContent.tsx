@@ -186,12 +186,15 @@ export default function StudentManagementContent() {
 
       {addOpen && (
         <AddStudentModal
+          open={addOpen}
           onClose={() => setAddOpen(false)}
           onAdd={handleAddStudent}
+          existingCount={students.length}
         />
       )}
       {editStudent && (
         <EditStudentModal
+          open={!!editStudent}
           student={editStudent}
           onClose={() => setEditStudent(null)}
           onSave={handleSaveEdit}
@@ -209,20 +212,24 @@ export default function StudentManagementContent() {
       )}
       {gatePassStudent && (
         <GatePassModal
+          open={!!gatePassStudent}
           student={gatePassStudent}
           onClose={() => setGatePassStudent(null)}
         />
       )}
       {idCardStudent && (
         <IDCardModal
+          open={!!idCardStudent}
           student={idCardStudent}
           onClose={() => setIdCardStudent(null)}
         />
       )}
       {csvImportOpen && (
         <CSVImportModal
+          open={csvImportOpen}
           onClose={() => setCsvImportOpen(false)}
           onImport={handleCSVImport}
+          existingCount={students.length}
         />
       )}
     </div>

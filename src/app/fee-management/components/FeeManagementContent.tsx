@@ -149,6 +149,7 @@ export default function FeeManagementContent() {
 
       {paymentOpen && (
         <RecordPaymentModal
+          open={paymentOpen}
           onClose={() => setPaymentOpen(false)}
           onRecord={handleRecordPayment}
           existingRecords={records}
@@ -156,12 +157,14 @@ export default function FeeManagementContent() {
       )}
       {receiptRecord && (
         <FeeReceiptModal
+          open={!!receiptRecord}
           record={receiptRecord}
           onClose={() => setReceiptRecord(null)}
         />
       )}
       {editRecord && (
         <EditFeeModal
+          open={!!editRecord}
           record={editRecord}
           onClose={() => setEditRecord(null)}
           onSave={handleSaveEdit}
