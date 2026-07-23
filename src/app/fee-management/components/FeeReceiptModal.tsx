@@ -50,6 +50,9 @@ export default function FeeReceiptModal({ open, onClose, record, allRecords }: F
 
   const balance = netFee - totalPaid;
 
+  // Agar fees fully paid hai to next semester dikhao, warna current semester
+  const displaySemester = balance <= 0 ? record.semester + 1 : record.semester;
+
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=820,height=700');
     if (!printWindow) return;
@@ -134,7 +137,7 @@ export default function FeeReceiptModal({ open, onClose, record, allRecords }: F
       </div>
       <div>
         <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Semester</p>
-        <p style="font-weight:600;font-size:13px;">Semester ${record.semester}</p>
+        <p style="font-weight:600;font-size:13px;">Semester ${displaySemester}</p>
       </div>
       <div>
         <p style="font-size:10px;color:#6b7280;margin-bottom:2px;">Institution</p>
@@ -264,7 +267,7 @@ export default function FeeReceiptModal({ open, onClose, record, allRecords }: F
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Semester</p>
-                <p className="font-semibold text-foreground">Semester {record.semester}</p>
+                <p className="font-semibold text-foreground">Semester {displaySemester}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Institution</p>
