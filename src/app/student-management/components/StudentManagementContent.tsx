@@ -202,12 +202,13 @@ export default function StudentManagementContent() {
       )}
       {deleteStudent && (
         <ConfirmModal
+          open={!!deleteStudent}
+          onClose={() => setDeleteStudent(null)}
           title="Delete Student"
-          message={`Are you sure you want to delete ${deleteStudent.name}? This will also remove their fee records.`}
+          description={`Are you sure you want to delete ${deleteStudent.name}? This will also remove their fee records.`}
           confirmLabel="Delete"
           loading={deleteLoading}
           onConfirm={handleDelete}
-          onCancel={() => setDeleteStudent(null)}
         />
       )}
       {gatePassStudent && (

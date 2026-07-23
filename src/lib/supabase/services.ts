@@ -76,7 +76,7 @@ export const studentService = {
   async delete(id: string) {
     const supabase = createClient();
     const { error } = await supabase.from('students').delete().eq('id', id);
-    if (error && isSchemaError(error)) throw error;
+    if (error) throw error;
   },
 
   async getByRollNo(rollNo: string) {
