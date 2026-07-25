@@ -58,7 +58,7 @@ const roleCards = [
 
 // Demo credentials for each role
 const demoCredentials: Record<'admin' | 'staff', { email: string; password: string }> = {
-  admin: { email: 'admin@gramodyog.in', password: 'Admin@1234' },
+  admin: { email: 'Admin', password: 'Rgp@12345' },
   staff: { email: 'staff@gramodyog.in', password: 'Staff@1234' },
 };
 
@@ -321,25 +321,7 @@ export default function LoginClient() {
                 </div>
               </div>
 
-              {/* Demo credentials hint for admin/staff */}
-              {(role === 'admin' || role === 'staff') && (
-                <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
-                  <p className="text-xs font-semibold text-amber-800 mb-1">Demo Credentials</p>
-                  <p className="text-xs text-amber-700">
-                    Email: <span className="font-mono font-bold">{demoCredentials[role].email}</span>
-                  </p>
-                  <p className="text-xs text-amber-700">
-                    Password: <span className="font-mono font-bold">{demoCredentials[role].password}</span>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={fillDemo}
-                    className="mt-1.5 text-xs text-amber-800 underline hover:text-amber-900 font-semibold"
-                  >
-                    Click to auto-fill →
-                  </button>
-                </div>
-              )}
+              {/* Demo credentials hint removed */}
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div>
