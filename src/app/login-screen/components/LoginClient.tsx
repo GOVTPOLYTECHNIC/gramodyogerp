@@ -99,7 +99,7 @@ export default function LoginClient() {
       try {
         // Step 1: Sign in with Supabase Auth
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email: data.identifier.trim().toLowerCase(),
+          email: !data.identifier.trim().includes('@') ? `${data.identifier.trim().toLowerCase()}@rgp.in` : data.identifier.trim().toLowerCase(),
           password: data.password,
         });
 
@@ -329,7 +329,7 @@ export default function LoginClient() {
                     {identifierLabel}
                   </label>
                   <input
-                    type={role === 'student' ? 'text' : 'email'}
+                    type="text"
                     placeholder={
                       role === 'student' ? 'Enter your Roll Number (e.g. RGP-2026-001)' : 'Enter your email address'
                     }
