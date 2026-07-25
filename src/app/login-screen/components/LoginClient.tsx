@@ -56,9 +56,14 @@ const roleCards = [
   },
 ];
 
+// Demo credentials for each role
+const demoCredentials: Record<'admin' | 'staff', { email: string; password: string }> = {
+  admin: { email: 'admin@gramodyog.in', password: 'Admin@1234' },
+  staff: { email: 'staff@gramodyog.in', password: 'Staff@1234' },
+};
+
 // Generate a unique password for each student based on their roll number and DOB
 function getStudentPassword(rollNo: string, dob: string): string {
-  // Password format: first part of rollNo + @ + DOB digits (DDMMYYYY)
   const dobDigits = dob.replace(/\//g, '');
   const rollPart = rollNo.replace(/-/g, '').slice(0, 6).toUpperCase();
   return `${rollPart}@${dobDigits}`;
@@ -74,8 +79,17 @@ export default function LoginClient() {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<LoginForm>({ defaultValues: { remember: false } });
+
+  const fillDemo = () => {
+    if (role === 'admin' || role === 'staff') {
+      const creds = demoCredentials[role];
+      setValue('identifier', creds.email);
+      setValue('password', creds.password);
+    }
+  };
 
   const onSubmit = async (data: LoginForm) => {
     if (!role) return;
@@ -83,18 +97,51 @@ export default function LoginClient() {
 
     if (role === 'admin' || role === 'staff') {
       try {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: data.identifier,
+        // Step 1: Sign in with Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: data.identifier.trim().toLowerCase(),
           password: data.password,
         });
-        if (error) {
-          toast.error('Invalid credentials. Please check your email and password.');
+
+        if (authError) {
+          toast.error(`Login failed: ${authError.message}`);
           setLoading(false);
           return;
         }
-        saveRole(role);
-        toast.success(`Welcome back! Logged in as ${role === 'admin' ? 'Admin' : 'Staff'}`);
-        window.location.href = role === 'admin' ? '/' : '/staff-attendance';
+
+        if (!authData.user) {
+          toast.error('Login failed. Please try again.');
+          setLoading(false);
+          return;
+        }
+
+        // Step 2: Fetch role from user_profiles
+        const { data: profileData, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', authData.user.id)
+          .single();
+
+        let userRole: 'admin' | 'staff' = role;
+
+        if (!profileError && profileData?.role) {
+          // Use role from database if available
+          if (profileData.role === 'admin' || profileData.role === 'staff') {
+            userRole = profileData.role;
+          }
+        }
+
+        // Step 3: Verify role matches what user selected
+        if (userRole !== role) {
+          toast.error(`Access denied. This account is registered as "${userRole}", not "${role}".`);
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+
+        saveRole(userRole);
+        toast.success(`Welcome back! Logged in as ${userRole === 'admin' ? 'Admin' : 'Staff'}`);
+        window.location.href = userRole === 'admin' ? '/' : '/staff-attendance';
       } catch {
         toast.error('Login failed. Please try again.');
         setLoading(false);
@@ -112,7 +159,7 @@ export default function LoginClient() {
         }
         const expectedPassword = getStudentPassword(matchedStudent.rollNo, matchedStudent.dob);
         if (data.password !== expectedPassword) {
-          toast.error('Invalid password. Please check and try again.');
+          toast.error('Invalid password. Your password is: RollNo (no dashes) + @ + DOB (DDMMYYYY)');
           setLoading(false);
           return;
         }
@@ -272,6 +319,26 @@ export default function LoginClient() {
                   </div>
                 </div>
               </div>
+
+              {/* Demo credentials hint for admin/staff */}
+              {(role === 'admin' || role === 'staff') && (
+                <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                  <p className="text-xs font-semibold text-amber-800 mb-1">Demo Credentials</p>
+                  <p className="text-xs text-amber-700">
+                    Email: <span className="font-mono font-bold">{demoCredentials[role].email}</span>
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    Password: <span className="font-mono font-bold">{demoCredentials[role].password}</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={fillDemo}
+                    className="mt-1.5 text-xs text-amber-800 underline hover:text-amber-900 font-semibold"
+                  >
+                    Click to auto-fill →
+                  </button>
+                </div>
+              )}
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div>
