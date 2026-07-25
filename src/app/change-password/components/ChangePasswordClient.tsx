@@ -104,15 +104,38 @@ export default function ChangePasswordClient() {
         return;
       }
 
-      // Step 2: Update to new password (session is now fresh from signInWithPassword above)
+      // Step 2: Explicitly set the session using tokens from signInWithPassword
+      // This ensures the session is active even in iframe/preview environments
+      if (signInData.session) {
+        await supabase.auth.setSession({
+          access_token: signInData.session.access_token,
+          refresh_token: signInData.session.refresh_token,
+        });
+      }
+
+      // Step 3: Update to new password using the freshly set session
       const { error: updateError } = await supabase.auth.updateUser({
         password: form.newPassword,
       });
 
       if (updateError) {
-        toast.error(updateError.message || 'Failed to update password. Please try again.');
-        setLoading(false);
-        return;
+        // If updateUser still fails, try the admin API route as fallback
+        const res = await fetch('/api/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: userEmail,
+            currentPassword: form.currentPassword,
+            newPassword: form.newPassword,
+            accessToken: signInData.session?.access_token,
+          }),
+        });
+        const result = await res.json();
+        if (!res.ok || result.error) {
+          toast.error(result.error || updateError.message || 'Failed to update password. Please try again.');
+          setLoading(false);
+          return;
+        }
       }
 
       setLoading(false);
