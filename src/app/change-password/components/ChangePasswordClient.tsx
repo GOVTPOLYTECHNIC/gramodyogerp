@@ -5,6 +5,7 @@ import { Eye, EyeOff, CheckCircle, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/AppLayout';
 import { createClient } from '@/lib/supabase/client';
+import { getUserEmail } from '@/lib/roleAccess';
 
 interface PasswordForm {
   currentPassword: string;
@@ -70,28 +71,40 @@ export default function ChangePasswordClient() {
     try {
       const supabase = createClient();
 
-      // Step 1: Get current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Get email from sessionStorage (saved at login) — works in iframe/preview too
+      let userEmail = getUserEmail();
 
-      if (sessionError || !session?.user?.email) {
-        toast.error('Session expired. Please log in again.');
+      // Fallback: try getUser() which uses the access token directly
+      if (!userEmail) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userEmail = user?.email ?? null;
+      }
+
+      // Fallback: try getSession()
+      if (!userEmail) {
+        const { data: { session } } = await supabase.auth.getSession();
+        userEmail = session?.user?.email ?? null;
+      }
+
+      if (!userEmail) {
+        toast.error('Could not identify your account. Please log out and log in again.');
         setLoading(false);
         return;
       }
 
-      // Step 2: Verify current password by re-authenticating
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: session.user.email,
+      // Step 1: Verify current password by re-authenticating
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
         password: form.currentPassword,
       });
 
-      if (signInError) {
+      if (signInError || !signInData?.user) {
         setErrors({ currentPassword: 'Current password is incorrect' });
         setLoading(false);
         return;
       }
 
-      // Step 3: Update to new password
+      // Step 2: Update to new password (session is now fresh from signInWithPassword above)
       const { error: updateError } = await supabase.auth.updateUser({
         password: form.newPassword,
       });

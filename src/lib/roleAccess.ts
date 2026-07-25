@@ -6,6 +6,7 @@ export type UserRole = 'admin' | 'staff' | 'student';
 const ROLE_KEY = 'gramodyog_role';
 const STUDENT_ID_KEY = 'gramodyog_student_id';
 const STUDENT_ROLL_KEY = 'gramodyog_student_roll';
+const USER_EMAIL_KEY = 'gramodyog_user_email';
 
 // Use sessionStorage so data clears when browser/tab is closed
 function getStorage(): Storage | null {
@@ -16,6 +17,16 @@ function getStorage(): Storage | null {
 export function saveRole(role: UserRole): void {
   const s = getStorage();
   if (s) s.setItem(ROLE_KEY, role);
+}
+
+export function saveUserEmail(email: string): void {
+  const s = getStorage();
+  if (s) s.setItem(USER_EMAIL_KEY, email);
+}
+
+export function getUserEmail(): string | null {
+  const s = getStorage();
+  return s ? s.getItem(USER_EMAIL_KEY) : null;
 }
 
 export function getRole(): UserRole | null {
@@ -32,6 +43,7 @@ export function clearRole(): void {
   s.removeItem(ROLE_KEY);
   s.removeItem(STUDENT_ID_KEY);
   s.removeItem(STUDENT_ROLL_KEY);
+  s.removeItem(USER_EMAIL_KEY);
 }
 
 export function saveStudentSession(id: string, roll: string): void {

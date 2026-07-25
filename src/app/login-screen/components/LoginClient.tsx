@@ -7,7 +7,7 @@ import Link from 'next/link';
 import AppLogo from '@/components/ui/AppLogo';
 import { createClient } from '@/lib/supabase/client';
 import { studentService } from '@/lib/supabase/services';
-import { saveRole, saveStudentSession } from '@/lib/roleAccess';
+import { saveRole, saveStudentSession, saveUserEmail } from '@/lib/roleAccess';
 
 type Role = 'admin' | 'staff' | 'student';
 
@@ -140,6 +140,7 @@ export default function LoginClient() {
         }
 
         saveRole(userRole);
+        saveUserEmail(data.identifier.trim().toLowerCase());
         toast.success(`Welcome back! Logged in as ${userRole === 'admin' ? 'Admin' : 'Staff'}`);
         window.location.href = userRole === 'admin' ? '/' : '/staff-attendance';
       } catch {
