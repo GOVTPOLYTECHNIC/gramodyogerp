@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import AppLayout from '@/components/AppLayout';
 import { createClient } from '@/lib/supabase/client';
 
-
 interface PasswordForm {
   currentPassword: string;
   newPassword: string;
@@ -29,7 +28,6 @@ export default function ChangePasswordClient() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const supabase = createClient();
 
   const validate = (): boolean => {
     const newErrors: FieldErrors = {};
@@ -70,18 +68,20 @@ export default function ChangePasswordClient() {
     setLoading(true);
 
     try {
-      // Step 1: Get current user directly from Supabase (not from context which may be stale)
-      const { data: { user: currentUser }, error: getUserError } = await supabase.auth.getUser();
+      const supabase = createClient();
 
-      if (getUserError || !currentUser?.email) {
-        toast.error('User session not found. Please log in again.');
+      // Step 1: Get current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.user?.email) {
+        toast.error('Session expired. Please log in again.');
         setLoading(false);
         return;
       }
 
       // Step 2: Verify current password by re-authenticating
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: currentUser.email,
+        email: session.user.email,
         password: form.currentPassword,
       });
 
@@ -101,9 +101,6 @@ export default function ChangePasswordClient() {
         setLoading(false);
         return;
       }
-
-      // Step 4: Refresh session so app keeps working
-      await supabase.auth.refreshSession();
 
       setLoading(false);
       setSuccess(true);

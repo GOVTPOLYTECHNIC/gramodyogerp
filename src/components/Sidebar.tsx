@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import { LayoutDashboard, Users, IndianRupee, CalendarCheck, CreditCard, LogOut, ChevronLeft, ChevronRight, GraduationCap, FileText, Settings, BarChart2, Scale, TrendingUp, AlertTriangle, Wallet, CalendarDays, KeyRound, BadgeIndianRupee,  } from 'lucide-react';
 import { getRole, clearRole, UserRole, roleRoutes } from '@/lib/roleAccess';
+import { createClient } from '@/lib/supabase/client';
 
 interface NavItem {
   id: string;
@@ -159,7 +160,13 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const userInfo = role ? roleLabels[role] : roleLabels['admin'];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {
+      // ignore sign out errors
+    }
     clearRole();
     window.location.href = '/login-screen';
   };

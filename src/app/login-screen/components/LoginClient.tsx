@@ -5,10 +5,9 @@ import { Eye, EyeOff, GraduationCap, Building2, Users, Shield, ArrowLeft } from 
 import { toast } from 'sonner';
 import Link from 'next/link';
 import AppLogo from '@/components/ui/AppLogo';
-
+import { createClient } from '@/lib/supabase/client';
 import { studentService } from '@/lib/supabase/services';
-
-
+import { saveRole, saveStudentSession } from '@/lib/roleAccess';
 
 type Role = 'admin' | 'staff' | 'student';
 
@@ -17,20 +16,6 @@ interface LoginForm {
   password: string;
   remember: boolean;
 }
-
-const adminCredentials = {
-  label: 'Admin',
-  identifier: 'admin@gramodyog.in',
-  password: 'GSS@Admin#2026',
-  identifierLabel: 'Email Address',
-};
-
-const staffCredentials = {
-  label: 'Staff',
-  identifier: 'staff.rajiv@gramodyog.in',
-  password: 'Staff@RGP#26',
-  identifierLabel: 'Email Address',
-};
 
 const schools = [
   { id: 'school-rgp', name: 'Rajiv Gandhi Polytechnic', short: 'RGP', icon: Building2 },
@@ -83,6 +68,7 @@ export default function LoginClient() {
   const [role, setRole] = useState<Role | null>(null);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const supabase = createClient();
 
   const {
     register,
@@ -91,74 +77,53 @@ export default function LoginClient() {
     formState: { errors },
   } = useForm<LoginForm>({ defaultValues: { remember: false } });
 
-  const onSubmit = (data: LoginForm) => {
+  const onSubmit = async (data: LoginForm) => {
     if (!role) return;
     setLoading(true);
 
-    if (role === 'admin') {
-      setTimeout(() => {
-        setLoading(false);
-        if (
-          data.identifier === adminCredentials.identifier &&
-          data.password === adminCredentials.password
-        ) {
-          toast.success('Welcome back! Logged in as Admin');
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('gramodyog_role', 'admin');
-            localStorage.removeItem('gramodyog_student_id');
-          }
-          window.location.href = '/';
-        } else {
+    if (role === 'admin' || role === 'staff') {
+      try {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: data.identifier,
+          password: data.password,
+        });
+        if (error) {
           toast.error('Invalid credentials. Please check your email and password.');
+          setLoading(false);
+          return;
         }
-      }, 1200);
-      return;
-    }
-
-    if (role === 'staff') {
-      setTimeout(() => {
+        saveRole(role);
+        toast.success(`Welcome back! Logged in as ${role === 'admin' ? 'Admin' : 'Staff'}`);
+        window.location.href = role === 'admin' ? '/' : '/staff-attendance';
+      } catch {
+        toast.error('Login failed. Please try again.');
         setLoading(false);
-        if (
-          data.identifier === staffCredentials.identifier &&
-          data.password === staffCredentials.password
-        ) {
-          toast.success('Welcome back! Logged in as Staff');
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('gramodyog_role', 'staff');
-            localStorage.removeItem('gramodyog_student_id');
-          }
-          window.location.href = '/staff-attendance';
-        } else {
-          toast.error('Invalid credentials. Please check your email and password.');
-        }
-      }, 1200);
+      }
       return;
     }
 
     if (role === 'student') {
-      // Fetch from Supabase
-      studentService.getByRollNo(data.identifier.trim()).then((matchedStudent) => {
-        setLoading(false);
+      try {
+        const matchedStudent = await studentService.getByRollNo(data.identifier.trim());
         if (!matchedStudent) {
           toast.error('Roll number not found. Please check and try again.');
+          setLoading(false);
           return;
         }
         const expectedPassword = getStudentPassword(matchedStudent.rollNo, matchedStudent.dob);
         if (data.password !== expectedPassword) {
           toast.error('Invalid password. Please check and try again.');
+          setLoading(false);
           return;
         }
+        saveRole('student');
+        saveStudentSession(matchedStudent.id, matchedStudent.rollNo);
         toast.success(`Welcome, ${matchedStudent.name}!`);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('gramodyog_role', 'student');
-          localStorage.setItem('gramodyog_student_id', matchedStudent.id);
-          localStorage.setItem('gramodyog_student_roll', matchedStudent.rollNo);
-        }
         window.location.href = '/fee-management';
-      }).catch(() => {
-        setLoading(false);
+      } catch {
         toast.error('Login failed. Please try again.');
-      });
+        setLoading(false);
+      }
       return;
     }
 
@@ -176,7 +141,7 @@ export default function LoginClient() {
   };
 
   const identifierLabel =
-    role === 'student' ? 'Roll Number' : role === 'staff' ? 'Email Address' : 'Email Address';
+    role === 'student' ? 'Roll Number' : 'Email Address';
 
   const roleLabel =
     role === 'admin' ? 'Admin' : role === 'staff' ? 'Staff' : 'Student';

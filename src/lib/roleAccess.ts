@@ -4,24 +4,52 @@
 export type UserRole = 'admin' | 'staff' | 'student';
 
 const ROLE_KEY = 'gramodyog_role';
+const STUDENT_ID_KEY = 'gramodyog_student_id';
+const STUDENT_ROLL_KEY = 'gramodyog_student_roll';
+
+// Use sessionStorage so data clears when browser/tab is closed
+function getStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage;
+}
 
 export function saveRole(role: UserRole): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(ROLE_KEY, role);
-  }
+  const s = getStorage();
+  if (s) s.setItem(ROLE_KEY, role);
 }
 
 export function getRole(): UserRole | null {
-  if (typeof window === 'undefined') return null;
-  const r = localStorage.getItem(ROLE_KEY);
+  const s = getStorage();
+  if (!s) return null;
+  const r = s.getItem(ROLE_KEY);
   if (r === 'admin' || r === 'staff' || r === 'student') return r;
   return null;
 }
 
 export function clearRole(): void {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(ROLE_KEY);
+  const s = getStorage();
+  if (!s) return;
+  s.removeItem(ROLE_KEY);
+  s.removeItem(STUDENT_ID_KEY);
+  s.removeItem(STUDENT_ROLL_KEY);
+}
+
+export function saveStudentSession(id: string, roll: string): void {
+  const s = getStorage();
+  if (s) {
+    s.setItem(STUDENT_ID_KEY, id);
+    s.setItem(STUDENT_ROLL_KEY, roll);
   }
+}
+
+export function getStudentId(): string | null {
+  const s = getStorage();
+  return s ? s.getItem(STUDENT_ID_KEY) : null;
+}
+
+export function getStudentRoll(): string | null {
+  const s = getStorage();
+  return s ? s.getItem(STUDENT_ROLL_KEY) : null;
 }
 
 // Routes accessible by each role
