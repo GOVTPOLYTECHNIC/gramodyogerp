@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import { LayoutDashboard, Users, IndianRupee, CalendarCheck, CreditCard, LogOut, ChevronLeft, ChevronRight, GraduationCap, FileText, Settings, BarChart2, Scale, TrendingUp, AlertTriangle, Wallet, CalendarDays, KeyRound, BadgeIndianRupee,  } from 'lucide-react';
+import { LayoutDashboard, Users, IndianRupee, CalendarCheck, CreditCard, LogOut, ChevronLeft, ChevronRight, GraduationCap, FileText, Settings, BarChart2, Scale, TrendingUp, AlertTriangle, Wallet, CalendarDays, KeyRound, BadgeIndianRupee, BookOpen } from 'lucide-react';
 import { getRole, clearRole, UserRole, roleRoutes } from '@/lib/roleAccess';
 import { createClient } from '@/lib/supabase/client';
 
@@ -129,9 +129,16 @@ const navItems: NavItem[] = [
     icon: <KeyRound size={18} />,
     group: 'System',
   },
+  {
+    id: 'nav-daily-income-expense',
+    label: 'Daily Income & Expense',
+    href: '/daily-income-expense',
+    icon: <BookOpen size={18} />,
+    group: 'Finance',
+  },
 ];
 
-const groups = ['Main', 'Academics', 'Documents', 'Reports', 'Staff', 'System'];
+const groups = ['Main', 'Academics', 'Documents', 'Finance', 'Reports', 'Staff', 'System'];
 
 const roleLabels: Record<UserRole, { name: string; email: string; initial: string }> = {
   admin: { name: 'Admin User', email: 'admin@gramodyog.in', initial: 'A' },

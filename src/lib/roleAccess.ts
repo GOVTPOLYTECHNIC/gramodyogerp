@@ -81,6 +81,7 @@ export const roleRoutes: Record<UserRole, string[]> = {
     '/staff-payroll',
     '/staff-salary',
     '/leave-management',
+    '/daily-income-expense',
     '/settings',
     '/change-password',
   ],
