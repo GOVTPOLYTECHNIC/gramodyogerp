@@ -68,6 +68,49 @@ export default function StudentManagementContent() {
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
+  const handleExport = () => {
+    if (filtered.length === 0) {
+      toast.error('No student data to export');
+      return;
+    }
+    const headers = [
+      'Roll No', 'Name', 'School', 'Course', 'Semester', 'Lateral Entry',
+      'Admission Year', 'DOB', 'Gender', 'Guardian Name', 'Phone', 'Address',
+      'Category', 'Aadhar', 'Fee Status', 'Total Fees', 'Paid Fees', 'Balance'
+    ];
+    const rows = filtered.map((s) => [
+      s.rollNo,
+      s.name,
+      s.school,
+      s.course,
+      s.semester,
+      s.lateralEntry ? 'Yes' : 'No',
+      s.admissionYear,
+      s.dob,
+      s.gender,
+      s.guardianName,
+      s.phone,
+      `"${s.address.replace(/"/g, '""')}"`,
+      s.category,
+      s.aadhar,
+      s.feeStatus,
+      s.totalFees,
+      s.paidFees,
+      s.totalFees - s.paidFees,
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `students_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`${filtered.length} student record(s) exported successfully`);
+  };
+
   const handleDelete = async () => {
     if (!deleteStudent) return;
     setDeleteLoading(true);
@@ -139,7 +182,10 @@ export default function StudentManagementContent() {
             <Upload size={14} />
             Import CSV
           </button>
-          <button className="btn-secondary flex items-center gap-2 text-xs h-9">
+          <button
+            onClick={handleExport}
+            className="btn-secondary flex items-center gap-2 text-xs h-9"
+          >
             <Download size={14} />
             Export
           </button>

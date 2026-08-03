@@ -94,6 +94,46 @@ export default function FeeManagementContent() {
     setEditRecord(null);
   };
 
+  const handleExportLedger = () => {
+    if (filtered.length === 0) {
+      toast.error('No fee records to export');
+      return;
+    }
+    const headers = [
+      'Receipt No', 'Roll No', 'Student Name', 'School', 'Course', 'Semester',
+      'Academic Year', 'Annual Fee', 'Discount', 'Paid Amount', 'Balance',
+      'Payment Date', 'Payment Mode', 'Status', 'Remarks'
+    ];
+    const rows = filtered.map((r) => [
+      r.receiptNo,
+      r.rollNo,
+      r.studentName,
+      r.school,
+      r.course,
+      r.semester,
+      r.academicYear,
+      r.annualFee,
+      r.discount,
+      r.paidAmount,
+      r.annualFee - r.discount - r.paidAmount,
+      r.paymentDate,
+      r.paymentMode,
+      r.status,
+      `"${r.remarks.replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `fee_ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`${filtered.length} fee record(s) exported successfully`);
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -105,7 +145,10 @@ export default function FeeManagementContent() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn-secondary flex items-center gap-2 text-xs h-9">
+          <button
+            onClick={handleExportLedger}
+            className="btn-secondary flex items-center gap-2 text-xs h-9"
+          >
             <Download size={14} />
             Export Ledger
           </button>
