@@ -83,100 +83,36 @@ export default function LoginClient() {
     formState: { errors },
   } = useForm<LoginForm>({ defaultValues: { remember: false } });
 
-  const fillDemo = () => {
-    if (role === 'admin' || role === 'staff') {
-      const creds = demoCredentials[role];
-      setValue('identifier', creds.email);
-      setValue('password', creds.password);
-    }
-  };
-
-  const onSubmit = async (data: LoginForm) => {
-    if (!role) return;
+ const onSubmit = async (data: LoginForm) => {
+  try {
     setLoading(true);
 
-    if (role === 'admin' || role === 'staff') {
-      try {
-        // Step 1: Sign in with Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email: !data.identifier.trim().includes('@') ? `${data.identifier.trim().toLowerCase()}@rgp.in` : data.identifier.trim().toLowerCase(),
-          password: data.password,
-        });
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        identifier: data.identifier,
+        password: data.password,
+      }),
+    });
 
-        if (authError) {
-          toast.error(`Login failed: ${authError.message}`);
-          setLoading(false);
-          return;
-        }
+    const result = await res.json();
 
-        if (!authData.user) {
-          toast.error('Login failed. Please try again.');
-          setLoading(false);
-          return;
-        }
-
-        // Step 2: Fetch role from user_profiles
-        const { data: profileData, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', authData.user.id)
-          .single();
-
-        let userRole: 'admin' | 'staff' = role;
-
-        if (!profileError && profileData?.role) {
-          // Use role from database if available
-          if (profileData.role === 'admin' || profileData.role === 'staff') {
-            userRole = profileData.role;
-          }
-        }
-
-        // Step 3: Verify role matches what user selected
-        if (userRole !== role) {
-          toast.error(`Access denied. This account is registered as "${userRole}", not "${role}".`);
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
-
-        saveRole(userRole);
-        saveUserEmail(data.identifier.trim().toLowerCase());
-        toast.success(`Welcome back! Logged in as ${userRole === 'admin' ? 'Admin' : 'Staff'}`);
-        window.location.href = userRole === 'admin' ? '/' : '/staff-attendance';
-      } catch {
-        toast.error('Login failed. Please try again.');
-        setLoading(false);
-      }
-      return;
+    if (result.success) {
+      toast.success("Login Successful");
+      window.location.href = "/";
+    } else {
+      toast.error(result.message || "Invalid credentials");
     }
-
-    if (role === 'student') {
-      try {
-        const matchedStudent = await studentService.getByRollNo(data.identifier.trim());
-        if (!matchedStudent) {
-          toast.error('Roll number not found. Please check and try again.');
-          setLoading(false);
-          return;
-        }
-        const expectedPassword = getStudentPassword(matchedStudent.rollNo, matchedStudent.dob);
-        if (data.password !== expectedPassword) {
-          toast.error('Invalid password. Your password is: RollNo (no dashes) + @ + DOB (DDMMYYYY)');
-          setLoading(false);
-          return;
-        }
-        saveRole('student');
-        saveStudentSession(matchedStudent.id, matchedStudent.rollNo);
-        toast.success(`Welcome, ${matchedStudent.name}!`);
-        window.location.href = '/fee-management';
-      } catch {
-        toast.error('Login failed. Please try again.');
-        setLoading(false);
-      }
-      return;
-    }
-
+  } catch (error) {
+    console.error(error);
+    toast.error("Server Error");
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
   const handleSelectRole = (r: Role) => {
     setRole(r);
