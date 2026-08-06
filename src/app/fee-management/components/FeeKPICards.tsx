@@ -10,7 +10,15 @@ interface FeeKPICardsProps {
 }
 
 export default function FeeKPICards({ records }: FeeKPICardsProps) {
-  const todayRecords = records.filter((r) => r.paymentDate === '17/07/2026');
+  // Compute today's date in DD/MM/YYYY format (matching paymentDate format in records)
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  const todayStr = `${dd}/${mm}/${yyyy}`;
+  const todayDisplay = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const todayRecords = records.filter((r) => r.paymentDate === todayStr);
   const collectedToday = todayRecords.reduce((sum, r) => sum + r.paidAmount, 0);
 
   // Group by studentId to avoid double-counting when a student has multiple payment records.
@@ -47,7 +55,7 @@ export default function FeeKPICards({ records }: FeeKPICardsProps) {
       id: 'kpi-fee-today',
       label: 'Fee Collected Today',
       value: `₹${collectedToday.toLocaleString('en-IN')}`,
-      sub: `${todayRecords.length} transactions on 17 Jul 2026`,
+      sub: `${todayRecords.length} transactions on ${todayDisplay}`,
       icon: IndianRupee,
       color: 'text-green-700',
       bg: 'bg-green-50',
