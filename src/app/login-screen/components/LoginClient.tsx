@@ -6,8 +6,8 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import AppLogo from '@/components/ui/AppLogo';
 import { createClient } from '@/lib/supabase/client';
-import { studentService } from '@/lib/supabase/services';
-import { saveRole, saveStudentSession, saveUserEmail } from '@/lib/roleAccess';
+
+
 
 type Role = 'admin' | 'staff' | 'student';
 

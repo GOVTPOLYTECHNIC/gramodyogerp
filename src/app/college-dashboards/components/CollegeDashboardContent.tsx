@@ -561,7 +561,8 @@ export default function CollegeDashboardContent() {
                 </tr>
               ) : (
                 students.map((student) => {
-                  const due = student.totalFees - student.paidFees;
+                  const actualPaid = paidByStudent[student.id] || 0;
+                  const due = student.totalFees - actualPaid;
                   const statusStyle: Record<string, string> = {
                     Paid: 'bg-green-50 text-green-700 border-green-200',
                     Partial: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -575,7 +576,7 @@ export default function CollegeDashboardContent() {
                       <td className="py-2.5 px-3 text-muted-foreground">{student.course}</td>
                       <td className="py-2.5 px-3 text-center text-muted-foreground">{student.semester}</td>
                       <td className="py-2.5 px-3 text-right font-tabular text-foreground">₹{student.totalFees.toLocaleString('en-IN')}</td>
-                      <td className="py-2.5 px-3 text-right font-tabular text-green-700">₹{student.paidFees.toLocaleString('en-IN')}</td>
+                      <td className="py-2.5 px-3 text-right font-tabular text-green-700">₹{actualPaid.toLocaleString('en-IN')}</td>
                       <td className={`py-2.5 px-3 text-right font-tabular font-semibold ${due > 0 ? 'text-red-600' : 'text-green-700'}`}>
                         {due > 0 ? `₹${due.toLocaleString('en-IN')}` : '—'}
                       </td>
@@ -599,10 +600,10 @@ export default function CollegeDashboardContent() {
                     ₹{students.reduce((s, st) => s + st.totalFees, 0).toLocaleString('en-IN')}
                   </td>
                   <td className="py-2.5 px-3 text-right font-bold font-tabular text-green-700">
-                    ₹{students.reduce((s, st) => s + st.paidFees, 0).toLocaleString('en-IN')}
+                    ₹{students.reduce((s, st) => s + (paidByStudent[st.id] || 0), 0).toLocaleString('en-IN')}
                   </td>
                   <td className="py-2.5 px-3 text-right font-bold font-tabular text-red-600">
-                    ₹{students.reduce((s, st) => s + (st.totalFees - st.paidFees), 0).toLocaleString('en-IN')}
+                    ₹{students.reduce((s, st) => s + Math.max(0, st.totalFees - (paidByStudent[st.id] || 0)), 0).toLocaleString('en-IN')}
                   </td>
                   <td />
                 </tr>
