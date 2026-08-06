@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, TrendingUp, TrendingDown, IndianRupee, Calendar, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, IndianRupee, Calendar, Pencil, Trash2, X, Check, Download } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 interface DailyEntry {
@@ -106,6 +106,30 @@ export default function DailyIncomeExpenseContent() {
   const totalExpense = useMemo(() => filtered.filter((e) => e.entry_type === 'expense').reduce((s, e) => s + e.amount, 0), [filtered]);
   const netBalance = totalIncome - totalExpense;
 
+  function handleDownload() {
+    if (filtered.length === 0) return;
+    const headers = ['Date', 'Type', 'Category', 'Description', 'Payment Mode', 'Reference No', 'Amount (INR)', 'Remarks'];
+    const rows = filtered.map((e) => [
+      e.entry_date,
+      e.entry_type === 'income' ? 'Income' : 'Expense',
+      e.category,
+      `"${e.description.replace(/"/g, '""')}"`,
+      paymentModeLabel[e.payment_mode] || e.payment_mode,
+      e.reference_no || '',
+      e.amount.toFixed(2),
+      e.remarks ? `"${e.remarks.replace(/"/g, '""')}"` : '',
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const today = new Date().toISOString().split('T')[0];
+    link.download = `daily-income-expense-${today}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function openAdd() {
     setEditEntry(null);
     setForm({ ...emptyForm });
@@ -189,13 +213,23 @@ export default function DailyIncomeExpenseContent() {
           <h1 className="text-2xl font-bold text-foreground">Daily Income &amp; Expense</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Track daily financial transactions</p>
         </div>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-        >
-          <Plus size={16} />
-          Add Entry
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownload}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-2 bg-card border border-border text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download size={16} />
+            Download CSV
+          </button>
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus size={16} />
+            Add Entry
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
