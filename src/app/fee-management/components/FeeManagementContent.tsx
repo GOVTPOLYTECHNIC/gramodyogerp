@@ -1,27 +1,57 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Download } from 'lucide-react';
-import { mockFeeRecords, FeeRecord } from './feeData';
+import { FeeRecord } from './feeData';
 import FeeKPICards from './FeeKPICards';
 import FeeFilters from './FeeFilters';
 import FeeTable from './FeeTable';
 import RecordPaymentModal from './RecordPaymentModal';
 import FeeReceiptModal from './FeeReceiptModal';
+import EditFeeModal from './EditFeeModal';
+import { feeService } from '@/lib/supabase/services';
 import { toast } from 'sonner';
 
 export default function FeeManagementContent() {
-  const [records, setRecords] = useState<FeeRecord[]>(mockFeeRecords);
+  const [records, setRecords] = useState<FeeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterMode, setFilterMode] = useState('');
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [receiptRecord, setReceiptRecord] = useState<FeeRecord | null>(null);
+  const [editRecord, setEditRecord] = useState<FeeRecord | null>(null);
   const [page, setPage] = useState(1);
+  const [studentRole, setStudentRole] = useState<string | null>(null);
+  const [studentRoll, setStudentRoll] = useState<string | null>(null);
   const perPage = 10;
 
+  useEffect(() => {
+    const role = typeof window !== 'undefined' ? localStorage.getItem('gramodyog_role') : null;
+    const roll = typeof window !== 'undefined' ? localStorage.getItem('gramodyog_student_roll') : null;
+    setStudentRole(role);
+    setStudentRoll(roll);
+    loadRecords();
+  }, []);
+
+  async function loadRecords() {
+    setLoading(true);
+    try {
+      const data = await feeService.getAll();
+      setRecords(data as FeeRecord[]);
+    } catch (e: any) {
+      toast.error('Failed to load fee records: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const filtered = useMemo(() => {
-    return records.filter((r) => {
+    let base = records;
+    if (studentRole === 'student' && studentRoll) {
+      base = base.filter((r) => r.rollNo.toLowerCase() === studentRoll.toLowerCase());
+    }
+    return base.filter((r) => {
       const q = search.toLowerCase();
       const matchSearch =
         !q ||
@@ -33,16 +63,75 @@ export default function FeeManagementContent() {
       const matchMode = !filterMode || r.paymentMode === filterMode;
       return matchSearch && matchSchool && matchStatus && matchMode;
     });
-  }, [records, search, filterSchool, filterStatus, filterMode]);
+  }, [records, search, filterSchool, filterStatus, filterMode, studentRole, studentRoll]);
 
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
-  const handleRecordPayment = (newRecord: FeeRecord) => {
-    // Backend integration point: POST /api/fee-payments
-    setRecords((prev) => [newRecord, ...prev]);
+  const handleRecordPayment = async (newRecord: FeeRecord) => {
+    try {
+      const result = await feeService.create(newRecord);
+      if (result) {
+        setRecords((prev) => [result as FeeRecord, ...prev]);
+        toast.success(`Payment recorded. Receipt ${newRecord.receiptNo} generated.`);
+      }
+    } catch (e: any) {
+      toast.error('Failed to record payment: ' + e.message);
+    }
     setPaymentOpen(false);
-    toast.success(`Payment recorded. Receipt ${newRecord.receiptNo} generated.`);
+  };
+
+  const handleSaveEdit = async (updated: FeeRecord) => {
+    try {
+      const result = await feeService.update(updated.id, updated);
+      if (result) {
+        setRecords((prev) => prev.map((r) => (r.id === updated.id ? (result as FeeRecord) : r)));
+        toast.success('Fee record updated successfully');
+      }
+    } catch (e: any) {
+      toast.error('Update failed: ' + e.message);
+    }
+    setEditRecord(null);
+  };
+
+  const handleExportLedger = () => {
+    if (filtered.length === 0) {
+      toast.error('No fee records to export');
+      return;
+    }
+    const headers = [
+      'Receipt No', 'Roll No', 'Student Name', 'School', 'Course', 'Semester',
+      'Academic Year', 'Annual Fee', 'Discount', 'Paid Amount', 'Balance',
+      'Payment Date', 'Payment Mode', 'Status', 'Remarks'
+    ];
+    const rows = filtered.map((r) => [
+      r.receiptNo,
+      r.rollNo,
+      r.studentName,
+      r.school,
+      r.course,
+      r.semester,
+      r.academicYear,
+      r.annualFee,
+      r.discount,
+      r.paidAmount,
+      r.annualFee - r.discount - r.paidAmount,
+      r.paymentDate,
+      r.paymentMode,
+      r.status,
+      `"${r.remarks.replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `fee_ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`${filtered.length} fee record(s) exported successfully`);
   };
 
   return (
@@ -52,11 +141,14 @@ export default function FeeManagementContent() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Fee Management</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Academic Year 2025–26 · {records.length} records
+            Academic Year 2026–27 · {loading ? 'Loading...' : `${records.length} records`}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn-secondary flex items-center gap-2 text-xs h-9">
+          <button
+            onClick={handleExportLedger}
+            className="btn-secondary flex items-center gap-2 text-xs h-9"
+          >
             <Download size={14} />
             Export Ledger
           </button>
@@ -70,44 +162,57 @@ export default function FeeManagementContent() {
         </div>
       </div>
 
-      {/* KPI Cards */}
       <FeeKPICards records={records} />
 
-      {/* Filters */}
       <FeeFilters
         search={search}
-        onSearch={(v) => { setSearch(v); setPage(1); }}
+        setSearch={setSearch}
         filterSchool={filterSchool}
-        onFilterSchool={(v) => { setFilterSchool(v); setPage(1); }}
+        setFilterSchool={setFilterSchool}
         filterStatus={filterStatus}
-        onFilterStatus={(v) => { setFilterStatus(v); setPage(1); }}
+        setFilterStatus={setFilterStatus}
         filterMode={filterMode}
-        onFilterMode={(v) => { setFilterMode(v); setPage(1); }}
+        setFilterMode={setFilterMode}
       />
 
-      {/* Table */}
-      <FeeTable
-        records={paginated}
-        onViewReceipt={setReceiptRecord}
-        page={page}
-        perPage={perPage}
-        total={filtered.length}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
+      {loading ? (
+        <div className="card p-8 text-center text-muted-foreground">Loading fee records from database...</div>
+      ) : (
+        <FeeTable
+          records={paginated}
+          allRecords={records}
+          page={page}
+          perPage={perPage}
+          total={filtered.length}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          onViewReceipt={setReceiptRecord}
+          onEdit={setEditRecord}
+        />
+      )}
 
-      {/* Modals */}
-      <RecordPaymentModal
-        open={paymentOpen}
-        onClose={() => setPaymentOpen(false)}
-        onRecord={handleRecordPayment}
-        existingCount={records.length}
-      />
+      {paymentOpen && (
+        <RecordPaymentModal
+          open={paymentOpen}
+          onClose={() => setPaymentOpen(false)}
+          onRecord={handleRecordPayment}
+          existingRecords={records}
+        />
+      )}
       {receiptRecord && (
         <FeeReceiptModal
           open={!!receiptRecord}
-          onClose={() => setReceiptRecord(null)}
           record={receiptRecord}
+          allRecords={records}
+          onClose={() => setReceiptRecord(null)}
+        />
+      )}
+      {editRecord && (
+        <EditFeeModal
+          open={!!editRecord}
+          record={editRecord}
+          onClose={() => setEditRecord(null)}
+          onSave={handleSaveEdit}
         />
       )}
     </div>

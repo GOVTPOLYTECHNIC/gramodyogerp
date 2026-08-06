@@ -26,7 +26,7 @@ const yearlyData = [
   { year: '2022-23', RGP: 108, ITI: 78, GSS: 36 },
   { year: '2023-24', RGP: 124, ITI: 89, GSS: 42 },
   { year: '2024-25', RGP: 138, ITI: 96, GSS: 48 },
-  { year: '2025-26', RGP: 152, ITI: 110, GSS: 55 },
+  { year: '2026-27', RGP: 152, ITI: 110, GSS: 55 },
 ];
 
 const courseWiseData = [
@@ -45,7 +45,7 @@ const genderData = [
   { year: '2022-23', Male: 132, Female: 90 },
   { year: '2023-24', Male: 148, Female: 107 },
   { year: '2024-25', Male: 162, Female: 120 },
-  { year: '2025-26', Male: 178, Female: 139 },
+  { year: '2026-27', Male: 178, Female: 139 },
 ];
 
 const CustomTooltip = ({
@@ -86,7 +86,7 @@ export default function EnrollmentTrendsContent() {
 
   const kpis = [
     {
-      label: 'Total Enrolled (2025-26)',
+      label: 'Total Enrolled (2026-27)',
       value: totalCurrent,
       sub: `+${growthPct}% vs last year`,
       icon: <Users size={20} />,

@@ -1,12 +1,14 @@
 'use client';
 import React from 'react';
-import { Eye, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { Eye, Pencil, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { FeeRecord } from './feeData';
 import Badge from '@/components/ui/Badge';
 
 interface FeeTableProps {
   records: FeeRecord[];
+  allRecords: FeeRecord[];
   onViewReceipt: (r: FeeRecord) => void;
+  onEdit: (r: FeeRecord) => void;
   page: number;
   perPage: number;
   total: number;
@@ -28,8 +30,21 @@ const modeColor: Record<string, string> = {
   Cheque: 'badge-muted',
 };
 
+/** Returns the cumulative total paid by a student for the same course/semester/year */
+function getCumulativePaid(record: FeeRecord, allRecords: FeeRecord[]): number {
+  return allRecords
+    .filter(
+      (r) =>
+        r.rollNo === record.rollNo &&
+        r.course === record.course &&
+        r.semester === record.semester &&
+        r.academicYear === record.academicYear
+    )
+    .reduce((sum, r) => sum + r.paidAmount, 0);
+}
+
 export default function FeeTable({
-  records, onViewReceipt,
+  records, allRecords, onViewReceipt, onEdit,
   page, perPage, total, totalPages, onPageChange,
 }: FeeTableProps) {
   if (records.length === 0) {
@@ -63,7 +78,8 @@ export default function FeeTable({
               <th className="table-th">Sem</th>
               <th className="table-th">Annual Fee</th>
               <th className="table-th">Discount</th>
-              <th className="table-th">Paid</th>
+              <th className="table-th">This Payment</th>
+              <th className="table-th">Total Paid</th>
               <th className="table-th">Balance</th>
               <th className="table-th">Mode</th>
               <th className="table-th">Date</th>
@@ -74,7 +90,8 @@ export default function FeeTable({
           <tbody>
             {records.map((r, i) => {
               const netFee = r.annualFee - r.discount;
-              const balance = netFee - r.paidAmount;
+              const totalPaid = getCumulativePaid(r, allRecords);
+              const balance = netFee - totalPaid;
               return (
                 <tr
                   key={r.id}
@@ -117,8 +134,11 @@ export default function FeeTable({
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="table-td font-tabular font-semibold text-foreground">
+                  <td className="table-td font-tabular text-foreground">
                     ₹{r.paidAmount.toLocaleString('en-IN')}
+                  </td>
+                  <td className="table-td font-tabular font-semibold text-foreground">
+                    ₹{totalPaid.toLocaleString('en-IN')}
                   </td>
                   <td className="table-td font-tabular">
                     <span className={balance > 0 ? 'text-danger font-bold' : 'text-success font-semibold'}>
@@ -139,6 +159,13 @@ export default function FeeTable({
                   <td className="table-td">
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                       <button
+                        onClick={() => onEdit(r)}
+                        title="Edit fee record"
+                        className="p-1.5 rounded-lg hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
                         onClick={() => onViewReceipt(r)}
                         title="View / Print fee receipt"
                         className="p-1.5 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition-colors"
@@ -158,7 +185,7 @@ export default function FeeTable({
       {/* Pagination */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-border bg-secondary/20">
         <p className="text-xs text-muted-foreground">
-          Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total} records
+          Showing {total === 0 ? 0 : (page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total} records
         </p>
         <div className="flex items-center gap-1">
           <button

@@ -1,8 +1,10 @@
 'use client';
-import React, { useState, useMemo } from 'react';
-import { Wallet, Search, FileText } from 'lucide-react';
-import { mockStaff, computePayroll, MONTHS, StaffMember } from './payrollData';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Wallet, Search, FileText, Plus, Trash2, X } from 'lucide-react';
+import { computePayroll, MONTHS, StaffMember } from './payrollData';
+import { staffService } from '@/lib/supabase/services';
 import SalarySlipModal from './SalarySlipModal';
+import { toast } from 'sonner';
 
 const COLLEGES = [
   'All',
@@ -33,15 +35,58 @@ const fmt = (n: number) =>
 const CURRENT_YEAR = '2026';
 const CURRENT_MONTH = 'July';
 
+const ROLES = ['Principal', 'HOD', 'Lecturer', 'Instructor', 'Lab Assistant', 'Clerk', 'Peon'] as const;
+
+interface AddStaffForm {
+  name: string;
+  empId: string;
+  college: string;
+  department: string;
+  role: string;
+  basicSalary: string;
+  hra: string;
+  ta: string;
+  da: string;
+  pf: string;
+  tds: string;
+}
+
+const emptyForm: AddStaffForm = {
+  name: '', empId: '', college: 'Rajiv Gandhi Polytechnic', department: '',
+  role: 'Lecturer', basicSalary: '', hra: '', ta: '', da: '', pf: '', tds: '',
+};
+
 export default function StaffPayrollContent() {
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [college, setCollege] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState(CURRENT_MONTH);
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const [slipStaff, setSlipStaff] = useState<StaffMember | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [form, setForm] = useState<AddStaffForm>(emptyForm);
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    loadStaff();
+  }, []);
+
+  async function loadStaff() {
+    setLoading(true);
+    try {
+      const data = await staffService.getAll();
+      setStaffList(data as StaffMember[]);
+    } catch (e: any) {
+      toast.error('Failed to load staff: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
-    return mockStaff.filter((s) => {
+    return staffList.filter((s) => {
       const matchSearch =
         search === '' ||
         s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -49,7 +94,7 @@ export default function StaffPayrollContent() {
       const matchCollege = college === 'All' || s.college === college;
       return matchSearch && matchCollege;
     });
-  }, [search, college]);
+  }, [search, college, staffList]);
 
   const totals = useMemo(() => {
     return filtered.reduce(
@@ -65,6 +110,54 @@ export default function StaffPayrollContent() {
     );
   }, [filtered]);
 
+  const handleAddStaff = async () => {
+    if (!form.name.trim() || !form.empId.trim() || !form.department.trim() || !form.basicSalary) {
+      setFormError('Name, Employee ID, Department and Basic Salary are required.');
+      return;
+    }
+    const newStaff: StaffMember = {
+      id: `staff-${Date.now()}`,
+      empId: form.empId.trim(),
+      name: form.name.trim(),
+      college: form.college as StaffMember['college'],
+      department: form.department.trim(),
+      role: form.role as StaffMember['role'],
+      basicSalary: Number(form.basicSalary) || 0,
+      hra: Number(form.hra) || 0,
+      ta: Number(form.ta) || 0,
+      da: Number(form.da) || 0,
+      pf: Number(form.pf) || 0,
+      tds: Number(form.tds) || 0,
+      otherDeductions: 0,
+      joiningDate: new Date().toLocaleDateString('en-IN'),
+      bankAccount: '',
+      ifsc: '',
+    };
+    try {
+      const result = await staffService.create(newStaff);
+      if (result) {
+        setStaffList((prev) => [...prev, result as StaffMember]);
+        toast.success('Staff member added successfully');
+      }
+    } catch (e: any) {
+      toast.error('Failed to add staff: ' + e.message);
+    }
+    setShowAddModal(false);
+    setForm(emptyForm);
+    setFormError('');
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await staffService.delete(id);
+      setStaffList((prev) => prev.filter((s) => s.id !== id));
+      toast.success('Staff member removed');
+    } catch (e: any) {
+      toast.error('Delete failed: ' + e.message);
+    }
+    setDeleteConfirmId(null);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -76,11 +169,10 @@ export default function StaffPayrollContent() {
           <div>
             <h1 className="text-xl font-bold text-foreground">Staff Payroll</h1>
             <p className="text-sm text-muted-foreground">
-              Salary records, deductions & monthly salary slip generation
+              Salary records, deductions &amp; monthly salary slip generation
             </p>
           </div>
         </div>
-        {/* Month/Year Selector */}
         <div className="flex items-center gap-2">
           <select
             value={selectedMonth}
@@ -100,13 +192,20 @@ export default function StaffPayrollContent() {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
+          <button
+            onClick={() => { setShowAddModal(true); setForm(emptyForm); setFormError(''); }}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus size={15} />
+            Add Staff
+          </button>
         </div>
       </div>
 
       {/* KPI Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Total Staff', value: String(filtered.length), sub: 'across selected colleges', color: 'text-foreground', bg: 'bg-muted' },
+          { label: 'Total Staff', value: loading ? '...' : String(filtered.length), sub: 'across selected colleges', color: 'text-foreground', bg: 'bg-muted' },
           { label: 'Gross Payroll', value: fmt(totals.gross), sub: `${selectedMonth} ${selectedYear}`, color: 'text-violet-700', bg: 'bg-violet-50' },
           { label: 'Net Payroll', value: fmt(totals.net), sub: `After ₹${(totals.deductions / 1000).toFixed(1)}K deductions`, color: 'text-emerald-700', bg: 'bg-emerald-50' },
         ].map((k, i) => (
@@ -135,89 +234,152 @@ export default function StaffPayrollContent() {
           onChange={(e) => setCollege(e.target.value)}
           className="px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
-          {COLLEGES.map((c) => (
-            <option key={c} value={c}>{c === 'All' ? 'All Colleges' : `${COLLEGE_SHORT[c]} — ${c}`}</option>
-          ))}
+          {COLLEGES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
-      {/* Payroll Table */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-border">
-          <span className="text-sm font-semibold text-foreground">
-            {filtered.length} staff member{filtered.length !== 1 ? 's' : ''} — {selectedMonth} {selectedYear}
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/50">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Employee</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">College</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Role</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Basic</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Allowances</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Gross</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-red-600">Deductions</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-emerald-600">Net Pay</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground">Slip</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s) => {
-                const { gross, deductions, net } = computePayroll(s);
-                const allowances = s.hra + s.ta + s.da;
-                return (
-                  <tr key={s.id} className="border-t border-border hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-foreground">{s.name}</p>
-                      <p className="text-xs text-muted-foreground">{s.empId}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${COLLEGE_COLORS[s.college]}`}>
-                        {COLLEGE_SHORT[s.college]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{s.role}</td>
-                    <td className="px-4 py-3 text-right text-xs font-medium">₹{s.basicSalary.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3 text-right text-xs font-medium">₹{allowances.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3 text-right text-xs font-semibold text-foreground">₹{gross.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3 text-right text-xs font-semibold text-red-600">₹{deductions.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-emerald-700">₹{net.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => setSlipStaff(s)}
-                        className="flex items-center gap-1 mx-auto px-2.5 py-1 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20 transition-colors"
-                      >
-                        <FileText size={12} />
-                        View
-                      </button>
-                    </td>
+      {/* Table */}
+      {loading ? (
+        <div className="card p-8 text-center text-muted-foreground">Loading staff from database...</div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-secondary/50 text-left">
+                  <th className="px-4 py-3 font-semibold text-muted-foreground">#</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground">Employee</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground">College</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground">Role</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Gross</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Deductions</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Net</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filtered.map((s, idx) => {
+                  const { gross, deductions, net } = computePayroll(s);
+                  const isDeleting = deleteConfirmId === s.id;
+                  return (
+                    <tr key={s.id} className="hover:bg-secondary/30 transition-colors">
+                      <td className="px-4 py-3 text-muted-foreground">{idx + 1}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-foreground">{s.name}</p>
+                        <p className="text-xs text-muted-foreground">{s.empId} · {s.department}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COLLEGE_COLORS[s.college] || 'bg-gray-100 text-gray-700'}`}>
+                          {COLLEGE_SHORT[s.college] || s.college}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{s.role}</td>
+                      <td className="px-4 py-3 text-right font-medium text-foreground">{fmt(gross)}</td>
+                      <td className="px-4 py-3 text-right text-red-600">-{fmt(deductions)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-emerald-700">{fmt(net)}</td>
+                      <td className="px-4 py-3">
+                        {isDeleting ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-red-600">Delete?</span>
+                            <button onClick={() => handleDelete(s.id)} className="text-xs text-red-600 hover:underline">Yes</button>
+                            <button onClick={() => setDeleteConfirmId(null)} className="text-xs text-muted-foreground hover:underline">No</button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSlipStaff(s)}
+                              className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors"
+                            >
+                              <FileText size={12} />
+                              Slip
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(s.id)}
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No staff found</td>
                   </tr>
-                );
-              })}
-              {/* Totals Row */}
-              <tr className="border-t-2 border-border bg-muted/40">
-                <td colSpan={5} className="px-4 py-3 text-xs font-bold text-foreground">
-                  Total ({filtered.length} staff)
-                </td>
-                <td className="px-4 py-3 text-right text-xs font-bold text-foreground">
-                  ₹{totals.gross.toLocaleString('en-IN')}
-                </td>
-                <td className="px-4 py-3 text-right text-xs font-bold text-red-600">
-                  ₹{totals.deductions.toLocaleString('en-IN')}
-                </td>
-                <td className="px-4 py-3 text-right text-sm font-bold text-emerald-700">
-                  ₹{totals.net.toLocaleString('en-IN')}
-                </td>
-                <td />
-              </tr>
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Salary Slip Modal */}
+      {/* Add Staff Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h2 className="font-semibold text-foreground">Add Staff Member</h2>
+              <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-secondary rounded-lg">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              {formError && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded">{formError}</p>}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Full Name *', key: 'name', type: 'text' },
+                  { label: 'Employee ID *', key: 'empId', type: 'text' },
+                  { label: 'Department *', key: 'department', type: 'text' },
+                  { label: 'Basic Salary *', key: 'basicSalary', type: 'number' },
+                  { label: 'HRA', key: 'hra', type: 'number' },
+                  { label: 'TA', key: 'ta', type: 'number' },
+                  { label: 'DA', key: 'da', type: 'number' },
+                  { label: 'PF', key: 'pf', type: 'number' },
+                  { label: 'TDS', key: 'tds', type: 'number' },
+                ].map(({ label, key, type }) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
+                    <input
+                      type={type}
+                      value={(form as any)[key]}
+                      onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                      className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">College</label>
+                  <select
+                    value={form.college}
+                    onChange={(e) => setForm((f) => ({ ...f, college: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    {COLLEGES.filter((c) => c !== 'All').map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Role</label>
+                  <select
+                    value={form.role}
+                    onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-5 border-t border-border">
+              <button onClick={() => setShowAddModal(false)} className="btn-secondary text-sm h-9">Cancel</button>
+              <button onClick={handleAddStaff} className="btn-primary text-sm h-9">Add Staff</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {slipStaff && (
         <SalarySlipModal
           staff={slipStaff}

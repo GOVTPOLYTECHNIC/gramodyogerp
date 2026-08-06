@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Eye, EyeOff, CheckCircle, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/AppLayout';
+import { createClient } from '@/lib/supabase/client';
+import { getUserEmail } from '@/lib/roleAccess';
 
 interface PasswordForm {
   currentPassword: string;
@@ -61,16 +63,88 @@ export default function ChangePasswordClient() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    // Backend integration point: POST /api/auth/change-password with { currentPassword, newPassword }
-    setTimeout(() => {
+
+    try {
+      const supabase = createClient();
+
+      // Get email from sessionStorage (saved at login) — works in iframe/preview too
+      let userEmail = getUserEmail();
+
+      // Fallback: try getUser() which uses the access token directly
+      if (!userEmail) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userEmail = user?.email ?? null;
+      }
+
+      // Fallback: try getSession()
+      if (!userEmail) {
+        const { data: { session } } = await supabase.auth.getSession();
+        userEmail = session?.user?.email ?? null;
+      }
+
+      if (!userEmail) {
+        toast.error('Could not identify your account. Please log out and log in again.');
+        setLoading(false);
+        return;
+      }
+
+      // Step 1: Verify current password by re-authenticating
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: form.currentPassword,
+      });
+
+      if (signInError || !signInData?.user) {
+        setErrors({ currentPassword: 'Current password is incorrect' });
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Explicitly set the session using tokens from signInWithPassword
+      // This ensures the session is active even in iframe/preview environments
+      if (signInData.session) {
+        await supabase.auth.setSession({
+          access_token: signInData.session.access_token,
+          refresh_token: signInData.session.refresh_token,
+        });
+      }
+
+      // Step 3: Update to new password using the freshly set session
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: form.newPassword,
+      });
+
+      if (updateError) {
+        // If updateUser still fails, try the admin API route as fallback
+        const res = await fetch('/api/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: userEmail,
+            currentPassword: form.currentPassword,
+            newPassword: form.newPassword,
+            accessToken: signInData.session?.access_token,
+          }),
+        });
+        const result = await res.json();
+        if (!res.ok || result.error) {
+          toast.error(result.error || updateError.message || 'Failed to update password. Please try again.');
+          setLoading(false);
+          return;
+        }
+      }
+
       setLoading(false);
       setSuccess(true);
       toast.success('Password changed successfully!');
-    }, 1200);
+    } catch (err: any) {
+      toast.error(err?.message || 'Something went wrong. Please try again.');
+      setLoading(false);
+    }
   };
 
   const passwordStrength = (pwd: string): { label: string; color: string; width: string } => {

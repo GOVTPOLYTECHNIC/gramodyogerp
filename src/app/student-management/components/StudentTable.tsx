@@ -2,10 +2,12 @@
 import React from 'react';
 import { Edit2, Trash2, FileText, CreditCard, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Student } from './studentData';
+import { FeeRecord } from '@/app/fee-management/components/feeData';
 import Badge from '@/components/ui/Badge';
 
 interface StudentTableProps {
   students: Student[];
+  feeRecords?: FeeRecord[];
   onEdit: (s: Student) => void;
   onDelete: (s: Student) => void;
   onGatePass: (s: Student) => void;
@@ -32,7 +34,7 @@ const schoolShort = (school: string) => {
 };
 
 export default function StudentTable({
-  students, onEdit, onDelete, onGatePass, onIDCard,
+  students, feeRecords = [], onEdit, onDelete, onGatePass, onIDCard,
   page, perPage, total, totalPages, onPageChange, onPerPageChange,
 }: StudentTableProps) {
   if (students.length === 0) {
@@ -74,7 +76,15 @@ export default function StudentTable({
           </thead>
           <tbody>
             {students.map((s, i) => {
-              const balance = s.totalFees - s.paidFees;
+              // Calculate actual paid amount from fee records (sum of all payments for this student)
+              const actualPaid = feeRecords
+                .filter((r) => r.studentId === s.id)
+                .reduce((sum, r) => sum + r.paidAmount, 0);
+              // Use actual paid if fee records exist, otherwise fall back to student.paidFees
+              const effectivePaid = feeRecords.some((r) => r.studentId === s.id)
+                ? actualPaid
+                : s.paidFees;
+              const balance = s.totalFees - effectivePaid;
               return (
                 <tr key={s.id} className="table-row group">
                   <td className="table-td text-muted-foreground text-xs">

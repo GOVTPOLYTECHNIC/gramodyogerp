@@ -274,7 +274,7 @@ export default function AddStudentModal({ open, onClose, onAdd, existingCount }:
             <div>
               <label className="block text-sm font-semibold text-foreground mb-1.5">Admission Year <span className="text-danger">*</span></label>
               <select className="input-field" {...register('admissionYear', { required: true })}>
-                {['2024','2025','2026'].map((y) => (
+                {['2024','2025','2026','2027','2028','2029'].map((y) => (
                   <option key={`add-year-${y}`} value={y}>{y}</option>
                 ))}
               </select>

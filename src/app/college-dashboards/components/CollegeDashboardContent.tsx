@@ -1,9 +1,10 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Users, IndianRupee, AlertCircle, Tag, Building2, CheckCircle2, Clock, XCircle,  } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,  } from 'recharts';
-import { mockStudents } from '@/app/student-management/components/studentData';
-import { mockFeeRecords } from '@/app/fee-management/components/feeData';
+import { studentService, feeService } from '@/lib/supabase/services';
+import { Student } from '@/app/student-management/components/studentData';
+import { FeeRecord } from '@/app/fee-management/components/feeData';
 
 type CollegeKey = 'RGP' | 'ITI' | 'GSS';
 
@@ -146,24 +147,60 @@ const BarTooltip = ({
 
 export default function CollegeDashboardContent() {
   const [activeCollege, setActiveCollege] = useState<CollegeKey>('RGP');
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [allFeeRecords, setAllFeeRecords] = useState<FeeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const [students, fees] = await Promise.all([
+          studentService.getAll(),
+          feeService.getAll(),
+        ]);
+        setAllStudents(students as Student[]);
+        setAllFeeRecords(fees as FeeRecord[]);
+      } catch (e) {
+        console.error('College dashboard fetch error:', e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
 
   const college = COLLEGES.find((c) => c.key === activeCollege)!;
   const schoolName = SCHOOL_MAP[activeCollege];
 
   const students = useMemo(
-    () => mockStudents.filter((s) => s.school === schoolName),
-    [schoolName]
+    () => allStudents.filter((s) => s.school === schoolName),
+    [allStudents, schoolName]
   );
 
   const feeRecords = useMemo(
-    () => mockFeeRecords.filter((f) => f.school === schoolName),
-    [schoolName]
+    () => allFeeRecords.filter((f) => f.school === schoolName),
+    [allFeeRecords, schoolName]
   );
 
   // KPI calculations
   const totalStudents = students.length;
   const totalRevenue = feeRecords.reduce((sum, f) => sum + f.paidAmount, 0);
-  const totalDues = students.reduce((sum, s) => sum + (s.totalFees - s.paidFees), 0);
+
+  // Compute actual paid per student from fee records (not stale s.paidFees)
+  const paidByStudent = useMemo(() => {
+    const map: Record<string, number> = {};
+    feeRecords.forEach((f) => {
+      map[f.studentId] = (map[f.studentId] || 0) + f.paidAmount;
+    });
+    return map;
+  }, [feeRecords]);
+
+  const totalDues = students.reduce((sum, s) => {
+    const actualPaid = paidByStudent[s.id] || 0;
+    return sum + Math.max(0, s.totalFees - actualPaid);
+  }, 0);
+
   const totalDiscount = feeRecords.reduce((sum, f) => sum + f.discount, 0);
   const newThisMonth = students.filter((s) => s.admissionYear === '2026').length;
 
@@ -257,7 +294,7 @@ export default function CollegeDashboardContent() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">College-wise Dashboards</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Gramodyog Sewa Sansthan — Academic Year 2025–26
+            Gramodyog Sewa Sansthan — Academic Year 2026–27
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-lg px-3 py-2">
@@ -524,7 +561,8 @@ export default function CollegeDashboardContent() {
                 </tr>
               ) : (
                 students.map((student) => {
-                  const due = student.totalFees - student.paidFees;
+                  const actualPaid = paidByStudent[student.id] || 0;
+                  const due = student.totalFees - actualPaid;
                   const statusStyle: Record<string, string> = {
                     Paid: 'bg-green-50 text-green-700 border-green-200',
                     Partial: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -538,7 +576,7 @@ export default function CollegeDashboardContent() {
                       <td className="py-2.5 px-3 text-muted-foreground">{student.course}</td>
                       <td className="py-2.5 px-3 text-center text-muted-foreground">{student.semester}</td>
                       <td className="py-2.5 px-3 text-right font-tabular text-foreground">₹{student.totalFees.toLocaleString('en-IN')}</td>
-                      <td className="py-2.5 px-3 text-right font-tabular text-green-700">₹{student.paidFees.toLocaleString('en-IN')}</td>
+                      <td className="py-2.5 px-3 text-right font-tabular text-green-700">₹{actualPaid.toLocaleString('en-IN')}</td>
                       <td className={`py-2.5 px-3 text-right font-tabular font-semibold ${due > 0 ? 'text-red-600' : 'text-green-700'}`}>
                         {due > 0 ? `₹${due.toLocaleString('en-IN')}` : '—'}
                       </td>
@@ -562,10 +600,10 @@ export default function CollegeDashboardContent() {
                     ₹{students.reduce((s, st) => s + st.totalFees, 0).toLocaleString('en-IN')}
                   </td>
                   <td className="py-2.5 px-3 text-right font-bold font-tabular text-green-700">
-                    ₹{students.reduce((s, st) => s + st.paidFees, 0).toLocaleString('en-IN')}
+                    ₹{students.reduce((s, st) => s + (paidByStudent[st.id] || 0), 0).toLocaleString('en-IN')}
                   </td>
                   <td className="py-2.5 px-3 text-right font-bold font-tabular text-red-600">
-                    ₹{students.reduce((s, st) => s + (st.totalFees - st.paidFees), 0).toLocaleString('en-IN')}
+                    ₹{students.reduce((s, st) => s + Math.max(0, st.totalFees - (paidByStudent[st.id] || 0)), 0).toLocaleString('en-IN')}
                   </td>
                   <td />
                 </tr>

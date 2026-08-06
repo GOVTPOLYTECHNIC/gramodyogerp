@@ -10,7 +10,7 @@ export default function DashboardContent() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Gramodyog Sewa Sansthan — Academic Year 2025–26
+            Gramodyog Sewa Sansthan — Academic Year 2026–27
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-lg px-3 py-2">

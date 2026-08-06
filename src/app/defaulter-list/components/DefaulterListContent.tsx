@@ -1,7 +1,9 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AlertTriangle, Search, Filter, Download, Phone, IndianRupee } from 'lucide-react';
-import { mockStudents } from '@/app/student-management/components/studentData';
+import { getStudents, getFeeRecords } from '@/lib/studentStore';
+import { Student } from '@/app/student-management/components/studentData';
+import { FeeRecord } from '@/app/fee-management/components/feeData';
 
 const COLLEGES = ['All', 'Rajiv Gandhi Polytechnic', 'Rajiv Gandhi ITI', 'GSS Diploma College'];
 const COLLEGE_SHORT: Record<string, string> = {
@@ -25,16 +27,33 @@ const fmt = (n: number) =>
     : `₹${n}`;
 
 export default function DefaulterListContent() {
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [allFeeRecords, setAllFeeRecords] = useState<FeeRecord[]>([]);
   const [search, setSearch] = useState('');
   const [college, setCollege] = useState('All');
   const [semester, setSemester] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [courseFilter, setCourseFilter] = useState('All');
+
+  useEffect(() => {
+    setAllStudents(getStudents());
+    setAllFeeRecords(getFeeRecords());
+  }, []);
+
+  // Compute actual paid per student from fee records
+  const paidByStudent = useMemo(() => {
+    const map: Record<string, number> = {};
+    allFeeRecords.forEach((f) => {
+      map[f.studentId] = (map[f.studentId] || 0) + f.paidAmount;
+    });
+    return map;
+  }, [allFeeRecords]);
 
   const defaulters = useMemo(() => {
-    return mockStudents.filter(
+    return allStudents.filter(
       (s) => s.feeStatus === 'Overdue' || s.feeStatus === 'Partial' || s.feeStatus === 'Pending'
     );
-  }, []);
+  }, [allStudents]);
 
   const filtered = useMemo(() => {
     return defaulters.filter((s) => {
@@ -50,7 +69,10 @@ export default function DefaulterListContent() {
     });
   }, [defaulters, search, college, semester, statusFilter]);
 
-  const totalPending = filtered.reduce((sum, s) => sum + (s.totalFees - s.paidFees), 0);
+  const totalPending = filtered.reduce((sum, s) => {
+    const actualPaid = paidByStudent[s.id] || 0;
+    return sum + Math.max(0, s.totalFees - actualPaid);
+  }, 0);
   const overdueCount = filtered.filter((s) => s.feeStatus === 'Overdue').length;
   const partialCount = filtered.filter((s) => s.feeStatus === 'Partial').length;
   const pendingCount = filtered.filter((s) => s.feeStatus === 'Pending').length;
@@ -59,8 +81,6 @@ export default function DefaulterListContent() {
     const src = college === 'All' ? defaulters : defaulters.filter((s) => s.school === college);
     return ['All', ...Array.from(new Set(src.map((s) => s.course)))];
   }, [college, defaulters]);
-
-  const [courseFilter, setCourseFilter] = useState('All');
 
   const finalFiltered = useMemo(() => {
     return filtered.filter((s) => courseFilter === 'All' || s.course === courseFilter);
@@ -202,7 +222,8 @@ export default function DefaulterListContent() {
               {finalFiltered.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="text-center py-10 text-muted-foreground text-sm">
-                    No defaulters found for the selected filters.
+                    {allStudents.length === 0
+                      ? 'No students enrolled yet. Add students from Student Management.' :'No defaulters found for the selected filters.'}
                   </td>
                 </tr>
               ) : (
@@ -224,10 +245,10 @@ export default function DefaulterListContent() {
                     <td className="px-4 py-3 text-center text-xs font-medium">{s.semester}</td>
                     <td className="px-4 py-3 text-right text-xs font-medium">{fmt(s.totalFees)}</td>
                     <td className="px-4 py-3 text-right text-xs font-medium text-emerald-700">
-                      {fmt(s.paidFees)}
+                      {fmt(paidByStudent[s.id] || s.paidFees)}
                     </td>
                     <td className="px-4 py-3 text-right text-xs font-bold text-red-600">
-                      {fmt(s.totalFees - s.paidFees)}
+                      {fmt(Math.max(0, s.totalFees - (paidByStudent[s.id] ?? s.paidFees)))}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span

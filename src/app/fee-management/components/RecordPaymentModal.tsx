@@ -3,13 +3,24 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '@/components/ui/Modal';
 import { FeeRecord, RECEIPT_PREFIX, School } from './feeData';
-import { mockStudents } from '@/app/student-management/components/studentData';
+import { studentService } from '@/lib/supabase/services';
 
 interface RecordPaymentModalProps {
   open: boolean;
   onClose: () => void;
   onRecord: (r: FeeRecord) => void;
-  existingCount: number;
+  existingRecords: FeeRecord[];
+}
+
+interface StudentOption {
+  id: string;
+  rollNo: string;
+  name: string;
+  school: string;
+  course: string;
+  semester: number;
+  totalFees: number;
+  lateralEntry: boolean;
 }
 
 interface FormValues {
@@ -21,21 +32,22 @@ interface FormValues {
 }
 
 export default function RecordPaymentModal({
-  open, onClose, onRecord, existingCount,
+  open, onClose, onRecord, existingRecords,
 }: RecordPaymentModalProps) {
   const [loading, setLoading] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState(mockStudents[0]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [students, setStudents] = useState<StudentOption[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<StudentOption | null>(null);
 
   const {
     register,
     handleSubmit,
     watch,
-    setValue,
     reset,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
-      studentId: mockStudents[0].id,
+      studentId: '',
       paymentMode: 'Cash',
       paidAmount: '',
       discount: '0',
@@ -43,32 +55,74 @@ export default function RecordPaymentModal({
     },
   });
 
+  // Load students from Supabase every time modal opens
+  useEffect(() => {
+    if (open) {
+      setStudentsLoading(true);
+      studentService.getAll()
+        .then((data: any[]) => {
+          const list: StudentOption[] = (data || []).map((s: any) => ({
+            id: s.id,
+            rollNo: s.rollNo || '',
+            name: s.name || '',
+            school: s.school || '',
+            course: s.course || '',
+            semester: Number(s.semester) || 1,
+            totalFees: Number(s.totalFees) || 0,
+            lateralEntry: Boolean(s.lateralEntry),
+          }));
+          setStudents(list);
+        })
+        .catch(() => setStudents([]))
+        .finally(() => setStudentsLoading(false));
+
+      // Reset form to blank selection
+      setSelectedStudent(null);
+      reset({ studentId: '', paymentMode: 'Cash', paidAmount: '', discount: '0', remarks: '' });
+    }
+  }, [open, reset]);
+
   const studentId = watch('studentId');
   const discountVal = Number(watch('discount') || 0);
   const paidAmountVal = Number(watch('paidAmount') || 0);
 
   useEffect(() => {
-    const s = mockStudents.find((st) => st.id === studentId);
-    if (s) setSelectedStudent(s);
-  }, [studentId]);
+    if (!studentId) {
+      setSelectedStudent(null);
+      return;
+    }
+    const s = students.find((st) => st.id === studentId);
+    setSelectedStudent(s || null);
+  }, [studentId, students]);
+
+  // Calculate already paid from fee records for this student
+  const alreadyPaid = selectedStudent
+    ? existingRecords
+        .filter((r) => r.studentId === selectedStudent.id)
+        .reduce((sum, r) => sum + r.paidAmount, 0)
+    : 0;
 
   const netFee = selectedStudent ? selectedStudent.totalFees - discountVal : 0;
-  const balance = netFee - paidAmountVal;
+  const balance = netFee - alreadyPaid - paidAmountVal;
 
   const onSubmit = (data: FormValues) => {
     setLoading(true);
     const s = selectedStudent;
     if (!s) return;
     const prefix = RECEIPT_PREFIX[s.school as School] || 'REC';
+    const existingCount = existingRecords.length;
     const receiptNo = `${prefix}-2026-${String(existingCount + 1).padStart(4, '0')}`;
     const paid = Number(data.paidAmount);
     const disc = Number(data.discount);
     const net = s.totalFees - disc;
-    const bal = net - paid;
+    const bal = net - alreadyPaid - paid;
 
     let status: FeeRecord['status'] = 'Pending';
-    if (paid >= net) status = 'Paid';
-    else if (paid > 0) status = 'Partial';
+    if (alreadyPaid + paid >= net) status = 'Paid';
+    else if (alreadyPaid + paid > 0) status = 'Partial';
+
+    const today = new Date();
+    const paymentDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
     const newRecord: FeeRecord = {
       id: `fee-${Date.now()}`,
@@ -82,14 +136,13 @@ export default function RecordPaymentModal({
       annualFee: s.totalFees,
       discount: disc,
       paidAmount: paid,
-      paymentDate: '17/07/2026',
+      paymentDate,
       paymentMode: data.paymentMode,
       remarks: data.remarks,
       status,
-      academicYear: '2025-26',
+      academicYear: '2026-27',
     };
 
-    // Backend integration point: POST /api/fee-payments with newRecord
     setTimeout(() => {
       setLoading(false);
       onRecord(newRecord);
@@ -108,16 +161,30 @@ export default function RecordPaymentModal({
           <p className="text-xs text-muted-foreground mb-1">
             Choosing a student auto-fills institution, course, and fee details
           </p>
-          <select
-            className="input-field"
-            {...register('studentId', { required: true })}
-          >
-            {mockStudents.map((s) => (
-              <option key={`pay-student-${s.id}`} value={s.id}>
-                {s.rollNo} — {s.name} ({s.school.includes('Polytechnic') ? 'RGP' : s.school.includes('ITI') ? 'ITI' : 'GSS'})
-              </option>
-            ))}
-          </select>
+          {studentsLoading ? (
+            <div className="input-field text-muted-foreground text-sm bg-secondary/50">
+              Loading students...
+            </div>
+          ) : students.length === 0 ? (
+            <div className="input-field text-muted-foreground text-sm bg-secondary/50">
+              No students found — please add students in Student Management first
+            </div>
+          ) : (
+            <select
+              className={`input-field ${errors.studentId ? 'border-danger' : ''}`}
+              {...register('studentId', { required: 'Please select a student' })}
+            >
+              <option value="">— Choose a student —</option>
+              {students.map((s) => (
+                <option key={`pay-student-${s.id}`} value={s.id}>
+                  {s.rollNo} — {s.name} ({s.school.includes('Polytechnic') ? 'RGP' : s.school.includes('ITI') ? 'ITI' : 'GSS'})
+                </option>
+              ))}
+            </select>
+          )}
+          {errors.studentId && (
+            <p className="text-xs text-danger mt-1">{errors.studentId.message}</p>
+          )}
         </div>
 
         {/* Student Info Preview */}
@@ -143,8 +210,8 @@ export default function RecordPaymentModal({
             </div>
             <div>
               <p className="text-muted-foreground">Already Paid</p>
-              <p className="font-semibold text-foreground font-tabular">
-                ₹{selectedStudent.paidFees.toLocaleString('en-IN')}
+              <p className="font-semibold text-emerald-600 font-tabular">
+                ₹{alreadyPaid.toLocaleString('en-IN')}
               </p>
             </div>
             <div>
@@ -239,6 +306,12 @@ export default function RecordPaymentModal({
               <span className="font-tabular font-bold">₹{netFee.toLocaleString('en-IN')}</span>
             </div>
             <div className="flex justify-between">
+              <span className="text-muted-foreground">Already Paid</span>
+              <span className="font-tabular font-semibold text-emerald-600">
+                ₹{alreadyPaid.toLocaleString('en-IN')}
+              </span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Amount Paying Now</span>
               <span className="font-tabular font-bold text-primary">
                 ₹{paidAmountVal.toLocaleString('en-IN')}
@@ -247,7 +320,10 @@ export default function RecordPaymentModal({
             <div className="flex justify-between border-t border-border pt-1.5">
               <span className="font-semibold text-foreground">Balance After Payment</span>
               <span className={`font-tabular font-bold ${balance > 0 ? 'text-danger' : 'text-success'}`}>
-                {balance > 0 ? `₹${balance.toLocaleString('en-IN')} due` : '✓ Fully Paid'}
+                {selectedStudent
+                  ? balance > 0
+                    ? `₹${balance.toLocaleString('en-IN')} due`
+                    : '✓ Fully Paid' :'—'}
               </span>
             </div>
           </div>
@@ -257,8 +333,8 @@ export default function RecordPaymentModal({
           <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
           <button
             type="submit"
-            disabled={loading}
-            className="btn-primary flex items-center gap-2 min-w-[160px] justify-center"
+            disabled={loading || students.length === 0 || !selectedStudent}
+            className="btn-primary flex items-center gap-2 min-w-[160px] justify-center disabled:opacity-50"
           >
             {loading ? (
               <>

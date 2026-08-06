@@ -10,12 +10,39 @@ interface FeeKPICardsProps {
 }
 
 export default function FeeKPICards({ records }: FeeKPICardsProps) {
-  const todayRecords = records.filter((r) => r.paymentDate === '17/07/2026');
+  // Compute today's date in DD/MM/YYYY format (matching paymentDate format in records)
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  const todayStr = `${dd}/${mm}/${yyyy}`;
+  const todayDisplay = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const todayRecords = records.filter((r) => r.paymentDate === todayStr);
   const collectedToday = todayRecords.reduce((sum, r) => sum + r.paidAmount, 0);
 
-  const totalPending = records.reduce((sum, r) => {
-    const netFee = r.annualFee - r.discount;
-    const balance = netFee - r.paidAmount;
+  // Group by studentId to avoid double-counting when a student has multiple payment records.
+  // For each student, find their annualFee and discount from the latest record,
+  // then sum all their payments to get total paid, and compute one balance per student.
+  const studentMap = new Map<string, { annualFee: number; discount: number; totalPaid: number }>();
+  for (const r of records) {
+    const existing = studentMap.get(r.studentId);
+    if (!existing) {
+      studentMap.set(r.studentId, {
+        annualFee: r.annualFee,
+        discount: r.discount,
+        totalPaid: r.paidAmount,
+      });
+    } else {
+      // Accumulate paid amounts; keep the latest annualFee/discount (use max discount)
+      existing.totalPaid += r.paidAmount;
+      existing.discount = Math.max(existing.discount, r.discount);
+    }
+  }
+
+  const totalPending = Array.from(studentMap.values()).reduce((sum, s) => {
+    const netFee = s.annualFee - s.discount;
+    const balance = netFee - s.totalPaid;
     return sum + (balance > 0 ? balance : 0);
   }, 0);
 
@@ -28,7 +55,7 @@ export default function FeeKPICards({ records }: FeeKPICardsProps) {
       id: 'kpi-fee-today',
       label: 'Fee Collected Today',
       value: `₹${collectedToday.toLocaleString('en-IN')}`,
-      sub: `${todayRecords.length} transactions on 17 Jul 2026`,
+      sub: `${todayRecords.length} transactions on ${todayDisplay}`,
       icon: IndianRupee,
       color: 'text-green-700',
       bg: 'bg-green-50',

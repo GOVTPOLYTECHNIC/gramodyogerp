@@ -1,24 +1,28 @@
 'use client';
-import React, { useState, useMemo } from 'react';
-import { Plus, Download } from 'lucide-react';
-import { mockStudents, Student } from './studentData';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Plus, Download, Upload } from 'lucide-react';
+import { Student } from './studentData';
+import { studentService } from '@/lib/supabase/services';
 import StudentFilters from './StudentFilters';
 import StudentTable from './StudentTable';
 import AddStudentModal from './AddStudentModal';
 import EditStudentModal from './EditStudentModal';
 import GatePassModal from './GatePassModal';
 import IDCardModal from './IDCardModal';
+import CSVImportModal from './CSVImportModal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
 
 export default function StudentManagementContent() {
-  const [students, setStudents] = useState<Student[]>(mockStudents);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
   const [filterCourse, setFilterCourse] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSemester, setFilterSemester] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [editStudent, setEditStudent] = useState<Student | null>(null);
   const [deleteStudent, setDeleteStudent] = useState<Student | null>(null);
   const [gatePassStudent, setGatePassStudent] = useState<Student | null>(null);
@@ -26,6 +30,23 @@ export default function StudentManagementContent() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+
+  // Load from Supabase on mount
+  useEffect(() => {
+    loadStudents();
+  }, []);
+
+  async function loadStudents() {
+    setLoading(true);
+    try {
+      const data = await studentService.getAll();
+      setStudents(data as Student[]);
+    } catch (e: any) {
+      toast.error('Failed to load students: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     return students.filter((s) => {
@@ -47,32 +68,100 @@ export default function StudentManagementContent() {
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
-  const handleDelete = () => {
+  const handleExport = () => {
+    if (filtered.length === 0) {
+      toast.error('No student data to export');
+      return;
+    }
+    const headers = [
+      'Roll No', 'Name', 'School', 'Course', 'Semester', 'Lateral Entry',
+      'Admission Year', 'DOB', 'Gender', 'Guardian Name', 'Phone', 'Address',
+      'Category', 'Aadhar', 'Fee Status', 'Total Fees', 'Paid Fees', 'Balance'
+    ];
+    const rows = filtered.map((s) => [
+      s.rollNo,
+      s.name,
+      s.school,
+      s.course,
+      s.semester,
+      s.lateralEntry ? 'Yes' : 'No',
+      s.admissionYear,
+      s.dob,
+      s.gender,
+      s.guardianName,
+      s.phone,
+      `"${s.address.replace(/"/g, '""')}"`,
+      s.category,
+      s.aadhar,
+      s.feeStatus,
+      s.totalFees,
+      s.paidFees,
+      s.totalFees - s.paidFees,
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `students_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`${filtered.length} student record(s) exported successfully`);
+  };
+
+  const handleDelete = async () => {
     if (!deleteStudent) return;
     setDeleteLoading(true);
-    // Backend integration point: DELETE /api/students/:id
-    setTimeout(() => {
+    try {
+      await studentService.delete(deleteStudent.id);
       setStudents((prev) => prev.filter((s) => s.id !== deleteStudent.id));
+      toast.success(`Student ${deleteStudent.name} deleted successfully`);
+    } catch (e: any) {
+      toast.error('Delete failed: ' + e.message);
+    } finally {
       setDeleteLoading(false);
       setDeleteStudent(null);
-      toast.success(`Student ${deleteStudent.name} deleted successfully`);
-    }, 800);
+    }
   };
 
-  const handleSaveEdit = (updated: Student) => {
-    // Backend integration point: PUT /api/students/:id
-    setStudents((prev) =>
-      prev.map((s) => (s.id === updated.id ? updated : s))
-    );
+  const handleSaveEdit = async (updated: Student) => {
+    try {
+      const result = await studentService.update(updated.id, updated);
+      if (result) {
+        setStudents((prev) => prev.map((s) => (s.id === updated.id ? (result as Student) : s)));
+        toast.success('Student record updated successfully');
+      }
+    } catch (e: any) {
+      toast.error('Update failed: ' + e.message);
+    }
     setEditStudent(null);
-    toast.success('Student record updated successfully');
   };
 
-  const handleAddStudent = (student: Student) => {
-    // Backend integration point: POST /api/students
-    setStudents((prev) => [student, ...prev]);
+  const handleAddStudent = async (student: Student) => {
+    try {
+      const result = await studentService.create(student);
+      if (result) {
+        setStudents((prev) => [result as Student, ...prev]);
+        toast.success(`${student.name} admitted successfully`);
+      }
+    } catch (e: any) {
+      toast.error('Add failed: ' + e.message);
+    }
     setAddOpen(false);
-    toast.success(`${student.name} admitted successfully`);
+  };
+
+  const handleCSVImport = async (importedStudents: Student[]) => {
+    try {
+      const results = await Promise.all(importedStudents.map((s) => studentService.create(s)));
+      const added = results.filter(Boolean) as Student[];
+      setStudents((prev) => [...added, ...prev]);
+      toast.success(`${added.length} student(s) imported successfully via CSV`);
+    } catch (e: any) {
+      toast.error('CSV import failed: ' + e.message);
+    }
+    setCsvImportOpen(false);
   };
 
   return (
@@ -82,11 +171,21 @@ export default function StudentManagementContent() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Student Management</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {students.length} students enrolled · {filtered.length} shown
+            {loading ? 'Loading...' : `${students.length} students enrolled`}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn-secondary flex items-center gap-2 text-xs h-9">
+          <button
+            onClick={() => setCsvImportOpen(true)}
+            className="btn-secondary flex items-center gap-2 text-xs h-9"
+          >
+            <Upload size={14} />
+            Import CSV
+          </button>
+          <button
+            onClick={handleExport}
+            className="btn-secondary flex items-center gap-2 text-xs h-9"
+          >
             <Download size={14} />
             Export
           </button>
@@ -95,78 +194,91 @@ export default function StudentManagementContent() {
             className="btn-primary flex items-center gap-2 h-9"
           >
             <Plus size={16} />
-            Admit New Student
+            Add Student
           </button>
         </div>
       </div>
 
-      {/* Filters */}
       <StudentFilters
         search={search}
-        onSearch={(v) => { setSearch(v); setPage(1); }}
+        onSearch={setSearch}
         filterSchool={filterSchool}
-        onFilterSchool={(v) => { setFilterSchool(v); setFilterCourse(''); setPage(1); }}
+        onFilterSchool={setFilterSchool}
         filterCourse={filterCourse}
-        onFilterCourse={(v) => { setFilterCourse(v); setPage(1); }}
+        onFilterCourse={setFilterCourse}
         filterStatus={filterStatus}
-        onFilterStatus={(v) => { setFilterStatus(v); setPage(1); }}
+        onFilterStatus={setFilterStatus}
         filterSemester={filterSemester}
-        onFilterSemester={(v) => { setFilterSemester(v); setPage(1); }}
+        onFilterSemester={setFilterSemester}
       />
 
-      {/* Table */}
-      <StudentTable
-        students={paginated}
-        onEdit={setEditStudent}
-        onDelete={setDeleteStudent}
-        onGatePass={setGatePassStudent}
-        onIDCard={setIdCardStudent}
-        page={page}
-        perPage={perPage}
-        total={filtered.length}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        onPerPageChange={(v) => { setPerPage(v); setPage(1); }}
-      />
+      {loading ? (
+        <div className="card p-8 text-center text-muted-foreground">Loading students from database...</div>
+      ) : (
+        <StudentTable
+          students={paginated}
+          page={page}
+          perPage={perPage}
+          totalPages={totalPages}
+          total={filtered.length}
+          onPageChange={setPage}
+          onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
+          onEdit={setEditStudent}
+          onDelete={setDeleteStudent}
+          onGatePass={setGatePassStudent}
+          onIDCard={setIdCardStudent}
+        />
+      )}
 
-      {/* Modals */}
-      <AddStudentModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onAdd={handleAddStudent}
-        existingCount={students.length}
-      />
+      {addOpen && (
+        <AddStudentModal
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onAdd={handleAddStudent}
+          existingCount={students.length}
+        />
+      )}
       {editStudent && (
         <EditStudentModal
           open={!!editStudent}
-          onClose={() => setEditStudent(null)}
           student={editStudent}
+          onClose={() => setEditStudent(null)}
           onSave={handleSaveEdit}
+        />
+      )}
+      {deleteStudent && (
+        <ConfirmModal
+          open={!!deleteStudent}
+          onClose={() => setDeleteStudent(null)}
+          title="Delete Student"
+          description={`Are you sure you want to delete ${deleteStudent.name}? This will also remove their fee records.`}
+          confirmLabel="Delete"
+          loading={deleteLoading}
+          onConfirm={handleDelete}
         />
       )}
       {gatePassStudent && (
         <GatePassModal
           open={!!gatePassStudent}
-          onClose={() => setGatePassStudent(null)}
           student={gatePassStudent}
+          onClose={() => setGatePassStudent(null)}
         />
       )}
       {idCardStudent && (
         <IDCardModal
           open={!!idCardStudent}
-          onClose={() => setIdCardStudent(null)}
           student={idCardStudent}
+          onClose={() => setIdCardStudent(null)}
         />
       )}
-      <ConfirmModal
-        open={!!deleteStudent}
-        onClose={() => setDeleteStudent(null)}
-        onConfirm={handleDelete}
-        title="Delete Student Record"
-        description={`Are you sure you want to permanently delete ${deleteStudent?.name}'s record? This action cannot be undone.`}
-        confirmLabel="Delete Student"
-        loading={deleteLoading}
-      />
+      {csvImportOpen && (
+        <CSVImportModal
+          open={csvImportOpen}
+          onClose={() => setCsvImportOpen(false)}
+          onImport={handleCSVImport}
+          existingCount={students.length}
+        />
+      )}
     </div>
   );
 }
