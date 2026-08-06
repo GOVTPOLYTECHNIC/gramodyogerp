@@ -6,8 +6,8 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import AppLogo from '@/components/ui/AppLogo';
 import { createClient } from '@/lib/supabase/client';
-
-
+import { studentService } from '@/lib/supabase/services';
+import { saveRole, saveStudentSession, saveUserEmail } from '@/lib/roleAccess';
 
 type Role = 'admin' | 'staff' | 'student';
 
@@ -83,44 +83,100 @@ export default function LoginClient() {
     formState: { errors },
   } = useForm<LoginForm>({ defaultValues: { remember: false } });
 
- const onSubmit = async (data: LoginForm) => {
-  try {
+  const fillDemo = () => {
+    if (role === 'admin' || role === 'staff') {
+      const creds = demoCredentials[role];
+      setValue('identifier', creds.email);
+      setValue('password', creds.password);
+    }
+  };
+
+  const onSubmit = async (data: LoginForm) => {
+    if (!role) return;
     setLoading(true);
 
-    // Map identifier to email for Supabase auth
-    let email = data.identifier.trim();
+    if (role === 'admin' || role === 'staff') {
+      try {
+        // Step 1: Sign in with Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: !data.identifier.trim().includes('@') ? `${data.identifier.trim().toLowerCase()}@rgp.in` : data.identifier.trim().toLowerCase(),
+          password: data.password,
+        });
 
-    // Admin shorthand mapping
-    if (email.toLowerCase() === 'admin') {
-      email = 'admin@rgp.in';
-    }
+        if (authError) {
+          toast.error(`Login failed: ${authError.message}`);
+          setLoading(false);
+          return;
+        }
 
-    // If identifier doesn't look like an email, try appending domain
-    if (!email.includes('@')) {
-      email = `${email}@gramodyog.in`;
-    }
+        if (!authData.user) {
+          toast.error('Login failed. Please try again.');
+          setLoading(false);
+          return;
+        }
 
-    const { data: authData, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: data.password,
-    });
+        // Step 2: Fetch role from user_profiles
+        const { data: profileData, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', authData.user.id)
+          .single();
 
-    if (error) {
-      toast.error('Invalid credentials. Please check your email and password.');
+        let userRole: 'admin' | 'staff' = role;
+
+        if (!profileError && profileData?.role) {
+          // Use role from database if available
+          if (profileData.role === 'admin' || profileData.role === 'staff') {
+            userRole = profileData.role;
+          }
+        }
+
+        // Step 3: Verify role matches what user selected
+        if (userRole !== role) {
+          toast.error(`Access denied. This account is registered as "${userRole}", not "${role}".`);
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+
+        saveRole(userRole);
+        saveUserEmail(data.identifier.trim().toLowerCase());
+        toast.success(`Welcome back! Logged in as ${userRole === 'admin' ? 'Admin' : 'Staff'}`);
+        window.location.href = userRole === 'admin' ? '/' : '/staff-attendance';
+      } catch {
+        toast.error('Login failed. Please try again.');
+        setLoading(false);
+      }
       return;
     }
 
-    if (authData?.user) {
-      toast.success('Login Successful');
-      window.location.href = '/';
+    if (role === 'student') {
+      try {
+        const matchedStudent = await studentService.getByRollNo(data.identifier.trim());
+        if (!matchedStudent) {
+          toast.error('Roll number not found. Please check and try again.');
+          setLoading(false);
+          return;
+        }
+        const expectedPassword = getStudentPassword(matchedStudent.rollNo, matchedStudent.dob);
+        if (data.password !== expectedPassword) {
+          toast.error('Invalid password. Your password is: RollNo (no dashes) + @ + DOB (DDMMYYYY)');
+          setLoading(false);
+          return;
+        }
+        saveRole('student');
+        saveStudentSession(matchedStudent.id, matchedStudent.rollNo);
+        toast.success(`Welcome, ${matchedStudent.name}!`);
+        window.location.href = '/fee-management';
+      } catch {
+        toast.error('Login failed. Please try again.');
+        setLoading(false);
+      }
+      return;
     }
-  } catch (error) {
-    console.error(error);
-    toast.error('Server Error. Please try again.');
-  } finally {
+
     setLoading(false);
-  }
-};
+  };
 
   const handleSelectRole = (r: Role) => {
     setRole(r);
