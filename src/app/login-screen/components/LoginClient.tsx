@@ -87,28 +87,36 @@ export default function LoginClient() {
   try {
     setLoading(true);
 
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        identifier: data.identifier,
-        password: data.password,
-      }),
+    // Map identifier to email for Supabase auth
+    let email = data.identifier.trim();
+
+    // Admin shorthand mapping
+    if (email.toLowerCase() === 'admin') {
+      email = 'admin@rgp.in';
+    }
+
+    // If identifier doesn't look like an email, try appending domain
+    if (!email.includes('@')) {
+      email = `${email}@gramodyog.in`;
+    }
+
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: data.password,
     });
 
-    const result = await res.json();
+    if (error) {
+      toast.error('Invalid credentials. Please check your email and password.');
+      return;
+    }
 
-    if (result.success) {
-      toast.success("Login Successful");
-      window.location.href = "/";
-    } else {
-      toast.error(result.message || "Invalid credentials");
+    if (authData?.user) {
+      toast.success('Login Successful');
+      window.location.href = '/';
     }
   } catch (error) {
     console.error(error);
-    toast.error("Server Error");
+    toast.error('Server Error. Please try again.');
   } finally {
     setLoading(false);
   }
