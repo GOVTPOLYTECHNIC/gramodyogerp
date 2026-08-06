@@ -97,41 +97,63 @@ export default function LoginClient() {
 
     if (role === 'admin' || role === 'staff') {
       try {
+        // Build email: if no @ present, try @rgp.in first, then @gramodyog.in as fallback
+        const rawId = data.identifier.trim();
+        const primaryEmail = rawId.includes('@')
+          ? rawId.toLowerCase()
+          : `${rawId.toLowerCase()}@rgp.in`;
+
         // Step 1: Sign in with Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email: !data.identifier.trim().includes('@') ? `${data.identifier.trim().toLowerCase()}@rgp.in` : data.identifier.trim().toLowerCase(),
+        let authData: any = null;
+        let authError: any = null;
+
+        const result1 = await supabase.auth.signInWithPassword({
+          email: primaryEmail,
           password: data.password,
         });
+        authData = result1.data;
+        authError = result1.error;
 
-        if (authError) {
-          toast.error(`Login failed: ${authError.message}`);
-          setLoading(false);
-          return;
-        }
-
-        if (!authData.user) {
-          toast.error('Login failed. Please try again.');
-          setLoading(false);
-          return;
-        }
-
-        // Step 2: Fetch role from user_profiles
-        const { data: profileData, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', authData.user.id)
-          .single();
-
-        let userRole: 'admin' | 'staff' = role;
-
-        if (!profileError && profileData?.role) {
-          // Use role from database if available
-          if (profileData.role === 'admin' || profileData.role === 'staff') {
-            userRole = profileData.role;
+        // Fallback: if primary email failed and identifier had no @, try @gramodyog.in
+        if (authError && !rawId.includes('@')) {
+          const fallbackEmail = `${rawId.toLowerCase()}@gramodyog.in`;
+          const result2 = await supabase.auth.signInWithPassword({
+            email: fallbackEmail,
+            password: data.password,
+          });
+          if (!result2.error && result2.data?.user) {
+            authData = result2.data;
+            authError = null;
           }
         }
 
-        // Step 3: Verify role matches what user selected
+        if (authError || !authData?.user) {
+          toast.error('Invalid credentials. Please check your login ID and password.');
+          setLoading(false);
+          return;
+        }
+
+        // Step 2: Fetch role from user_profiles (best-effort — don't block login on failure)
+        let userRole: 'admin' | 'staff' = role;
+
+        try {
+          const { data: profileData, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', authData.user.id)
+            .single();
+
+          if (!profileError && profileData?.role) {
+            if (profileData.role === 'admin' || profileData.role === 'staff') {
+              userRole = profileData.role;
+            }
+          }
+          // If profileError, fall back to selected role — don't block login
+        } catch {
+          // Profile fetch failed — use selected role as fallback
+        }
+
+        // Step 3: Verify role matches what user selected (only if profile was fetched successfully)
         if (userRole !== role) {
           toast.error(`Access denied. This account is registered as "${userRole}", not "${role}".`);
           await supabase.auth.signOut();
@@ -140,7 +162,7 @@ export default function LoginClient() {
         }
 
         saveRole(userRole);
-        saveUserEmail(data.identifier.trim().toLowerCase());
+        saveUserEmail(rawId.toLowerCase());
         toast.success(`Welcome back! Logged in as ${userRole === 'admin' ? 'Admin' : 'Staff'}`);
         window.location.href = userRole === 'admin' ? '/' : '/staff-attendance';
       } catch {
